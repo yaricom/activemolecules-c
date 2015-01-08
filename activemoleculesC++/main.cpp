@@ -874,16 +874,16 @@ class ActiveMolecules {
         // do pass
         
         //----------------------------------------------------
-        int pass_num = 6;
+        int pass_num = 9;
         
         GBTConfig conf;
         conf.sampling_size_ratio = 0.5;
-        conf.learning_rate = 0.1;//0.1;
-        conf.tree_min_nodes = 10;
-        conf.tree_depth = 3;
-        conf.tree_number = 130;
+        conf.learning_rate = 0.19;//0.21;
+        conf.tree_min_nodes = 22;
+        conf.tree_depth = 1;
+        conf.tree_number = 22;
         
-        double simSplit = 0.655;
+        double simSplit = 0.99;
         //----------------------------------------------------
         
         VC<VC<Entry>>passRes;
@@ -941,8 +941,51 @@ class ActiveMolecules {
 private:
     
     void correctBySimilarity(const VC<Entry> &training, const VC<Entry> &test, double simSplit, VC<Entry> &simResults) {
-        cerr << "Similarity split: " << simSplit << endl;
+        // calculate MSE
+        double mae = 0;
+        VD vals;
+        for (Entry e : test) {
+            int testId = e.id;
+            double testDv = e.dv;
+            double dvSum = 0;
+            double wSum = 0;
+            for (Entry trEntry : training) {
+                double sim = matrix[testId][trEntry.id];
+                if (trEntry.dv > Entry::NVL) {
+                    dvSum += sim * trEntry.dv;
+                    wSum += sim;
+                }
+            }
+            double corr = dvSum / wSum;
+            vals.PB(corr);
+            mae += abs(testDv - corr);
+            
+            if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", dvSum: " << dvSum << ", correction: " << corr << ", weights: " <<  wSum << endl;
+        }
+        mae /= test.size();
+        if (LOG_DEBUG) cerr << "MAE: " << mae << endl;
         
+        int index = 0;
+        for (Entry e : test) {
+            int testId = e.id;
+            double testDv = e.dv;
+            
+            double diff = testDv - vals[index];
+            if (abs(diff) <= mae) {
+                if (diff < 0) {
+                    testDv =  vals[index] - mae / 2;
+                } else if (diff > 0){
+                    testDv =  vals[index] + mae / 2;
+                }
+                if (LOG_DEBUG) cerr << "Entry: " << testId << " corrected with value: " << testDv << endl;
+            }
+            
+            Entry resEntry(testId);
+            resEntry.dv = testDv;
+            simResults.PB(resEntry);
+            index++;
+        }
+        /*
         for (Entry e : test) {
             int testId = e.id;
             double testDv = e.dv;
@@ -972,7 +1015,7 @@ private:
             Entry resEntry(testId);
             resEntry.dv = testDv;
             simResults.PB(resEntry);
-        }
+        }*/
     }
     
     void rank(const VC<VD> &input_x, const VD &input_y, const VC<Entry> &testing, const GBTConfig &conf, VC<Entry> &rank) {
