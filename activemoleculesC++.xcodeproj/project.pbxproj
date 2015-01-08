@@ -165,7 +165,7 @@
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
-				SYMROOT = "$(SRCROOT)/tester";
+				SYMROOT = build;
 			};
 			name = Debug;
 		};
@@ -201,7 +201,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.10;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
-				SYMROOT = "$(SRCROOT)/tester";
+				SYMROOT = build;
 			};
 			name = Release;
 		};
@@ -211,7 +211,7 @@
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				INSTALL_PATH = "$(SRCROOT)/tester";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SYMROOT = "$(SRCROOT)/tester";
+				SYMROOT = build;
 			};
 			name = Debug;
 		};
@@ -221,7 +221,7 @@
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				INSTALL_PATH = "$(SRCROOT)/tester";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SYMROOT = "$(SRCROOT)/tester";
+				SYMROOT = build;
 			};
 			name = Release;
 		};
@@ -244,6 +244,7 @@
 				7850FA191A5C6A2D0045D4EF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

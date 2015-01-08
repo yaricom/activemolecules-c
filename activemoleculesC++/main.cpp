@@ -57,7 +57,7 @@ using namespace std;
 template<class T> string i2s(T x) {ostringstream o; o << x; return o.str();}
 VS splt(string s, char c = ',') {VS all; int p = 0, np; while (np = s.find(c, p), np >= 0) {if (np != p) all.PB(s.substr(p, np - p)); p = np + 1;} if (p < s.S) all.PB(s.substr(p)); return all;}
 
-static bool LOG_DEBUG = false;
+static bool LOG_DEBUG = true;
 
 double getTime() {
     timeval tv;
@@ -186,7 +186,8 @@ VC<Entry> parseData(const VS &data, int startIndex) {
     VC<Entry> v;
     int index = startIndex;
     for (const string &s : data) {
-        v.PB(Entry(index++, s));
+        Entry e(index++, s);
+        v.PB(e);
     }
     return v;
 }
@@ -638,35 +639,7 @@ class GradientBoostingTree {
     int m_tree_depth;
     
 public:
-    /**
-     * Creates new boosting tree with specified parameters
-     *
-     * @param sample_size_ratio Subsample size is some constant fraction f of the size of the training set. When f = 1,
-     *                          the algorithm is deterministic and identical to the one described above. Smaller values
-     *                          of f introduce randomness into the algorithm and help prevent overfitting, acting as a
-     *                          kind of regularization. The algorithm also becomes faster, because regression trees have
-     *                          to be fit to smaller datasets at each iteration. Friedman obtained that 0.5 <= f <= 0.8
-     *                          leads to good results for small and moderate sized training sets. Therefore, f is
-     *                          typically set to 0.5, meaning that one half of the training set is used to build each
-     *                          base learner.
-     * @param learning_rate     Empirically it has been found that using small learning rates (such as v < 0.1) yields
-     *                          dramatic improvements in model's generalization ability over gradient boosting without
-     *                          shrinking (v = 1). However, it comes at the price of increasing computational time both
-     *                          during training and querying: lower learning rate requires more iterations.
-     * @param tree_number       The default number of trees
-     * @param tree_min_nodes    Gradient tree boosting implementations often also use regularization by limiting
-     *                          the minimum number of observations in trees' terminal nodes. It is used in the tree
-     *                          building process by ignoring any splits that lead to nodes containing fewer than this
-     *                          number of training set instances.  Imposing this limit helps to reduce variance in
-     *                          predictions at leaves.
-     * @param tree_depth        The number of terminal nodes in trees, is the method's parameter which can be adjusted for
-     *                          a data set at hand. It controls the maximum allowed level of interaction between variables
-     *                          in the model. With J = 2 (decision stumps), no interaction between variables is allowed.
-     *                          With J = 3 the model may include effects of the interaction between up to two variables,
-     *                          and so on. Hastie et al.[6] comment that typically 4 <= J <= 8 work well for boosting and
-     *                          results are fairly insensitive to the choice of J in this range, J = 2 is insufficient for
-     *                          many applications, and J > 10 is unlikely to be required.
-     */
+
     GradientBoostingTree(double sample_size_ratio, double learning_rate,
                                 int tree_number, int tree_min_nodes, int tree_depth) {
         // This will be called when initialize the class with parameters
@@ -869,8 +842,13 @@ class ActiveMolecules {
         VC<VD> input_x;
         VD input_y;
         for (Entry e : training) {
-            input_x.PB(e.features);
-            input_y.PB(e.dv);
+            if (e.dv > Entry::NVL) {
+                // check for DV set only for training data and add TEST data without checks
+                input_x.PB(e.features);
+                input_y.PB(e.dv);
+            } else {
+                cerr << "Entry id: " << e.id << " missing DV" << endl;
+            }
         }
         
         double startTime = getTime();
@@ -956,9 +934,11 @@ private:
                 // pass through the matrix
                 double sim = matrix[testId][i];
                 if (simSplit < sim) {
-                    dvSum += sim * training[i].dv;
-                    wSum += sim;
-                    count++;
+                    if (training[i].dv > Entry::NVL) {
+                        dvSum += sim * training[i].dv;
+                        wSum += sim;
+                        count++;
+                    }
                 }
             }
             double correction = dvSum / wSum;
