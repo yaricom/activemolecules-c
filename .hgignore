@@ -5,6 +5,9 @@ syntax: glob
 # The data files
 data/*
 
+# The build directory
+build/*
+
 # Backup files left behind by the Emacs editor.
 *~
 
