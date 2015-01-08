@@ -55,7 +55,20 @@ using namespace std;
 #define VVS         VC < VS >
 
 template<class T> string i2s(T x) {ostringstream o; o << x; return o.str();}
-VS splt(string s, char c = ',') {VS all; int p = 0, np; while (np = s.find(c, p), np >= 0) {if (np != p) all.PB(s.substr(p, np - p)); p = np + 1;} if (p < s.S) all.PB(s.substr(p)); return all;}
+VS splt(string s, char c = ',') {
+    VS all;
+    int p = 0, np;
+    while (np = s.find(c, p), np >= 0) {
+        if (np != p)
+            all.PB(s.substr(p, np - p));
+        else
+            all.PB("");
+        p = np + 1;
+    }
+    if (p < s.size())
+        all.PB(s.substr(p));
+    return all;
+}
 
 static bool LOG_DEBUG = true;
 
@@ -144,8 +157,6 @@ struct Entry {
         return s == "" ? NVL : atof(s.c_str());
     }
     
-    Entry(){}
-    
     Entry(int sId) {
         id = sId;
     }
@@ -162,8 +173,12 @@ struct Entry {
         }
 
         // set DV if present
-        if (vs.S == fCount + 1) {
+        if (vs.size() == fCount + 1) {
             dv = parse(vs[fCount]);
+            if (dv < 0) {
+                // missed activity
+                dv = NVL;
+            }
         } else {
             dv = NVL;
         }
@@ -182,14 +197,24 @@ struct GBTConfig {
     int tree_depth = 3;
 };
 
-VC<Entry> parseData(const VS &data, int startIndex) {
-    VC<Entry> v;
+void parseData(const VS &data, const int startIndex, VC<Entry> &v) {
     int index = startIndex;
     for (const string &s : data) {
-        Entry e(index++, s);
-        v.PB(e);
+        v.PB(Entry(index++, s));
     }
-    return v;
+}
+
+template<class bidiiter>
+bidiiter random_unique(bidiiter begin, bidiiter end, size_t num_random) {
+    size_t left = std::distance(begin, end);
+    while (num_random--) {
+        bidiiter r = begin;
+        std::advance(r, rand()%left);
+        std::swap(*begin, *r);
+        ++begin;
+        --left;
+    }
+    return begin;
 }
 
 class RandomSample {
@@ -205,27 +230,17 @@ public:
     }
     
     VI get_sample_index() {
-        VI re_res;
+        // fill vector with indices
+        VI re_res(m_max);
+        for (int i = 0; i < m_max; ++i)
+            re_res[i] = i;
         
-        // random number generator
-        random_device rd;
-//        mt19937 generator(rd());
-        default_random_engine generator(rd());
-        uniform_int_distribution<int> distribution(0, m_max - 1);
-        
-        // number of data in the vector
-        bool bool_tag[m_max];
-        
-        
-        int num;
-        for (int loop_index = 0; loop_index < m_number; loop_index ++) {
-            do {
-                num = distribution(generator);
-            } while(bool_tag[num]);
+        // suffle
+        random_unique(re_res.begin(), re_res.end(), m_number);
 
-            bool_tag[num] = true;
-            re_res.PB(num);
-        }
+        // resize vector
+        re_res.resize(m_number);
+        VI(re_res).swap(re_res);
         
         return re_res;
     }
@@ -801,8 +816,6 @@ public:
         // set the learning rate and return
         // res_fun.m_combine_weight = m_learning_rate;
         
-        if (LOG_DEBUG) cerr << "fitGradientBoostingTree complete" << endl;
-        
         return res_fun;
     }
 };
@@ -835,8 +848,12 @@ class ActiveMolecules {
         cerr << "GB SC Training length:" << X << ", testing length: " << Y << endl;
         
         // parse data
-        VC<Entry> training = parseData(train, 0);
-        VC<Entry> testing = parseData(test, X);
+        VC<Entry> training;
+        VC<Entry> testing;
+        parseData(train, 0, training);
+        parseData(test, X, testing);
+        
+        assert(training.size() == X && testing.size() == Y);
         
         // prepare data
         VC<VD> input_x;
@@ -846,35 +863,38 @@ class ActiveMolecules {
                 // check for DV set only for training data and add TEST data without checks
                 input_x.PB(e.features);
                 input_y.PB(e.dv);
-            } else {
+            } else if (LOG_DEBUG){
                 cerr << "Entry id: " << e.id << " missing DV" << endl;
             }
         }
+        
+        if (LOG_DEBUG) cerr << "Real train size: " << input_x.size() << endl;
         
         double startTime = getTime();
         // do pass
         
         //----------------------------------------------------
         int pass_num = 6;
-        VC<VC<Entry>>passRes;
         
+        GBTConfig conf;
+        conf.sampling_size_ratio = 0.5;
+        conf.learning_rate = 0.1;//0.1;
+        conf.tree_min_nodes = 10;
+        conf.tree_depth = 3;
+        conf.tree_number = 130;
+        
+        double simSplit = 0.655;
+        //----------------------------------------------------
+        
+        VC<VC<Entry>>passRes;
         for (int i = 0; i < pass_num; i++) {
-            GBTConfig conf;
-            conf.sampling_size_ratio = 0.5;
-            conf.learning_rate = 0.05;//0.01;
-            conf.tree_min_nodes = 10;
-            conf.tree_depth = 3;
-            conf.tree_number = 130;//450;// + i * 10;
-            
             if (LOG_DEBUG) cerr << "Pass #" << i << endl;
             
             VC<Entry> rankList;
             rank(input_x, input_y, testing, conf, rankList);
             passRes.PB(rankList);
         }
-        double simSplit = 0.655;
-        //----------------------------------------------------
-        
+
         double rankTime = getTime();
         
         // find mean
@@ -912,6 +932,7 @@ class ActiveMolecules {
             ids.PB(e.id);
         }
         
+        cerr << "pass_num: " << pass_num << ", learning_rate: " << conf.learning_rate << ", tree_number: " << conf.tree_number << ", split: " << simSplit << endl;
         cerr << "Rank time: " << rankTime - startTime << ", full time: " << finishTime - startTime << endl;
         
         return ids;
@@ -929,24 +950,23 @@ private:
             int count = 0;
             double dvSum = 0;
             double wSum = 0;
-            int cols = X;
-            for (int i = 0; i < cols; i++) {
+            for (Entry trEntry : training) {
                 // pass through the matrix
-                double sim = matrix[testId][i];
-                if (simSplit < sim) {
-                    if (training[i].dv > Entry::NVL) {
-                        dvSum += sim * training[i].dv;
-                        wSum += sim;
-                        count++;
-                    }
+                double sim = matrix[testId][trEntry.id];
+                if (simSplit < sim && trEntry.dv > Entry::NVL) {
+                    dvSum += sim * trEntry.dv;
+                    wSum += sim;
+                    count++;
                 }
             }
-            double correction = dvSum / wSum;
-            if (LOG_DEBUG)
-                cerr << "TestDV: " << testDv << ", dvSum: " << dvSum << ", correction: " << correction << ", weights: " <<  wSum << endl;
+            
+            if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", dvSum: " << dvSum  << ", weights: " <<  wSum << endl;
             
             if (dvSum > 0) {
+                double correction = dvSum / wSum;
                 testDv = correction;
+                
+                if (LOG_DEBUG) cerr << ", correction: " << correction << endl;
             }
             
             Entry resEntry(testId);
