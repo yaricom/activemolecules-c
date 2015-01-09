@@ -140,8 +140,6 @@ struct RNG {
     }
 };
 
-static RNG stRng;
-
 struct Entry {
     static constexpr double NVL = -1000;
     
@@ -878,10 +876,10 @@ class ActiveMolecules {
         
         GBTConfig conf;
         conf.sampling_size_ratio = 0.5;
-        conf.learning_rate = 0.19;//0.21;
-        conf.tree_min_nodes = 22;
-        conf.tree_depth = 1;
-        conf.tree_number = 22;
+        conf.learning_rate = 0.01;//0.19;//0.21;
+        conf.tree_min_nodes = 10;//22;
+        conf.tree_depth = 3;//1;
+        conf.tree_number = 100;//22;
         
         double simSplit = 0.99;
         //----------------------------------------------------
@@ -919,9 +917,8 @@ class ActiveMolecules {
         
         double finishTime = getTime();
         
-        if (LOG_DEBUG) {
-            cerr << "++++ OUT ++++" << endl;
-        }
+        if (LOG_DEBUG) cerr << "++++ OUT ++++" << endl;
+        
         // sort to have highest rating at the top
         sort(simResults.rbegin(), simResults.rend());
         
@@ -949,18 +946,31 @@ private:
             double testDv = e.dv;
             double dvSum = 0;
             double wSum = 0;
+            
+            double maxSim = -1;
+            double maxVal = -1000;
             for (Entry trEntry : training) {
                 double sim = matrix[testId][trEntry.id];
                 if (trEntry.dv > Entry::NVL) {
                     dvSum += sim * trEntry.dv;
                     wSum += sim;
+                    
+                    if (sim > maxSim) {
+                        maxSim = sim;
+                        maxVal = trEntry.dv;
+                    }
                 }
             }
-            double corr = dvSum / wSum;
-            vals.PB(corr);
-            mae += abs(testDv - corr);
             
-            if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", dvSum: " << dvSum << ", correction: " << corr << ", weights: " <<  wSum << endl;
+            double corr = dvSum / wSum;
+//            vals.PB(corr);
+//            mae += abs(testDv - corr);
+            
+            vals.PB(maxVal);
+            mae += abs(testDv - maxVal);
+            
+//            if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", dvSum: " << dvSum << ", correction: " << corr << ", weights: " <<  wSum << endl;
+            if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", maxSim: " << maxSim << ", maxVal: " << maxVal << endl;
         }
         mae /= test.size();
         if (LOG_DEBUG) cerr << "MAE: " << mae << endl;
