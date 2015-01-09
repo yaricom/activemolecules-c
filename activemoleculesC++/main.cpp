@@ -810,16 +810,16 @@ class ActiveMolecules {
         // do pass
         
         //----------------------------------------------------
-        int pass_num = 1;//9;
+        int pass_num = 9;
         
         GBTConfig conf;
         conf.sampling_size_ratio = 0.5;
-        conf.learning_rate = 0.01;//0.19;//0.21;
-        conf.tree_min_nodes = 10;//22;
-        conf.tree_depth = 3;//1;
-        conf.tree_number = 100;//22;
+        conf.learning_rate = 0.19;//0.21;
+        conf.tree_min_nodes = 22;
+        conf.tree_depth = 1;
+        conf.tree_number = 22;
         
-        double simSplit = 0;//0.8;
+        double simSplit = 0;//0.65;//0.8;
         //----------------------------------------------------
         
         VC<VC<Entry>>passRes;
@@ -881,8 +881,8 @@ private:
         double mse = 0;
         double yMax = -10000;
         double yMin = 10000;
-        VD vals;
-        VD dvRel;
+        VD corrections;
+        VD errors;
         int corrCount = 0;
         for (Entry e : test) {
             int testId = e.id;
@@ -899,21 +899,22 @@ private:
             }
             
             double corr = 0;
+            double err = 0;
             if (wSum > 0) {
-                corr = dvSum / training.size();// wSum;
+                corr = dvSum / wSum;
+                
                 double ae = abs(testDv - corr);
                 mae += ae;
                 mse += ae * ae;
-
-                vals.PB(corr);
+                err = ae / testDv;
                 
-                double err = ae / testDv;
-                dvRel.PB(err);
-                
-                corrCount++;
-            } else {
-                dvRel.PB(0);
+                if (corr != 0) corrCount++;
+ 
             }
+            // store for subsequent use
+            errors.PB(err);
+            corrections.PB(corr);
+            
             
             // find max/min
             if (testDv > yMax) {
@@ -937,39 +938,33 @@ private:
         if (LOG_DEBUG) cerr << corrCount << " to be corrected" << endl;
         if (LOG_DEBUG) cerr << "MAE: " << mae << ", MSE: " << mse << ", RMSE: " << rmse << ", NRSME: " << nrmse << ", Ymax/Ymin: " << yMax << "/" << yMin << endl;
         
-        int index = 0;
         corrCount = 0;
+        int index = 0;
         for (Entry e : test) {
             int testId = e.id;
             double testDv = e.dv;
-            double correction = vals[index];
-            double dvCoef = dvRel[index];
+            double correction = corrections[index];
+            double dvCoef = errors[index];
             
             if (correction != 0) {
-                
-//                double diff = testDv - correction;
-//                if (abs(diff) > nrmse) {
-//                    testDv = correction;
-//                
-//                    corrCount++;
-//                    
-//                    if (LOG_DEBUG) cerr << "Entry: " << testId << " corrected with value: " << testDv << ", diff: " << diff << endl;
-//                }
             
-//                if (dvCoef < mae) {
-                    testDv -= correction;
+                double diff = dvCoef - correction;
+                if (abs(diff) < nrmse) {
+                    testDv += correction;
+//                    testDv += diff;
                     
                     corrCount++;
                     
-                    if (LOG_DEBUG) cerr << "Entry: " << testId << " corrected with value: " << testDv << ", dvCoef: " << dvCoef << endl;
-//                }
+                    if (LOG_DEBUG)
+                        cerr << "Entry: " << testId << " corrected with value: " << testDv << ", dvCoef: " << dvCoef <<  ", correction: " << correction << " diff: " << diff << endl;
+                }
             }
+            index++;
             
             
             Entry resEntry(testId);
             resEntry.dv = testDv;
             simResults.PB(resEntry);
-            index++;
         }
         
         if (LOG_DEBUG) cerr << corrCount << " was corrected" << endl;
@@ -1034,7 +1029,7 @@ int main(int argc, const char * argv[]) {
     cout.flush();
     
     
-    cerr << "Training data size: " << trainingData.S << ", testing data size: " << testingData.S << ", return size: " << ret.S;
+    cerr << "Training data size: " << trainingData.S << ", testing data size: " << testingData.S << ", return size: " << ret.S << endl;
     
     return 0;
 }
