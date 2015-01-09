@@ -26,6 +26,7 @@
 		7850FA101A5C6A2D0045D4EF /* activemoleculesC++ */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "activemoleculesC++"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7850FA131A5C6A2D0045D4EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		7850FA1A1A5C6A8C0045D4EF /* stdc++.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "stdc++.h"; sourceTree = "<group>"; };
+		78C2111B1A5FD96300756600 /* Utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Utils.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +59,7 @@
 		7850FA121A5C6A2D0045D4EF /* activemoleculesC++ */ = {
 			isa = PBXGroup;
 			children = (
+				78C2111B1A5FD96300756600 /* Utils.h */,
 				7850FA131A5C6A2D0045D4EF /* main.cpp */,
 				7850FA1A1A5C6A8C0045D4EF /* stdc++.h */,
 			);
