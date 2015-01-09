@@ -493,6 +493,39 @@ private:
             mean_value = mean_value / split_res.m_obs_right.size();
             split_res.m_right_value = mean_value;
             
+        } else if (m_type == MAXIMAL) {
+            double max_value = 0.0;
+            VD::iterator iter = split_res.m_obs_left.begin();
+            if (++iter != split_res.m_obs_left.end()) {
+                max_value = *iter;
+            }
+            
+            while (++iter != split_res.m_obs_left.end()) {
+                double sel_value = *iter;
+                if (max_value < sel_value) {
+                    max_value = sel_value;
+                }
+            }
+            
+            split_res.m_left_value = max_value;
+            
+            
+            // right value
+            max_value = 0.0;
+            iter = split_res.m_obs_right.begin();
+            if (++iter != split_res.m_obs_right.end()) {
+                max_value = *iter;
+            }
+            
+            while (++iter != split_res.m_obs_right.end()) {
+                double sel_value = *iter;
+                if (max_value < sel_value) {
+                    max_value = sel_value;
+                }
+            }
+            
+            split_res.m_right_value = max_value;
+            
         } else {
             // Unknown terminal type
             assert(false);
@@ -761,6 +794,7 @@ class ActiveMolecules {
     int Y;
     int M;
     VC<VD>matrix;
+    VI gtfRank;
     
     public:
     
@@ -804,6 +838,17 @@ class ActiveMolecules {
             }
         }
         
+        // create ground truth ranked list
+        for (int i = 0; i < X; i++) {
+            int rankI = 0;
+            for (int j = 0; j < X; j++) {
+                if (i != j) {
+                    if (input_y[j] > input_y[i]) rankI++;
+                }
+            }
+            gtfRank.PB(rankI);
+        }
+        
         if (LOG_DEBUG) cerr << "Real train size: " << input_x.size() << endl;
         
         double startTime = getTime();
@@ -814,12 +859,12 @@ class ActiveMolecules {
         
         GBTConfig conf;
         conf.sampling_size_ratio = 0.5;
-        conf.learning_rate = 0.19;//0.21;
+        conf.learning_rate = 0.1;//0.21;
         conf.tree_min_nodes = 22;
-        conf.tree_depth = 1;
+        conf.tree_depth = 3;
         conf.tree_number = 22;
         
-        double simSplit = 0;//0.65;//0.8;
+        double simSplit = 0.0;//0.65;//0.8;
         //----------------------------------------------------
         
         VC<VC<Entry>>passRes;
@@ -858,11 +903,11 @@ class ActiveMolecules {
         if (LOG_DEBUG) cerr << "++++ OUT ++++" << endl;
         
         // sort to have highest rating at the top
-        sort(simResults.rbegin(), simResults.rend());
+        sort(simResults.begin(), simResults.end());
         
         VI ids;
         for (Entry e : simResults) {
-//            if (LOG_DEBUG) cerr << "ID: " << e.id << ", activity: " << e.dv << endl;
+            if (LOG_DEBUG) cerr << "ID: " << e.id << ", activity: " << e.dv << endl;
             
             ids.PB(e.id);
         }
@@ -883,12 +928,15 @@ private:
         double yMin = 10000;
         VD corrections;
         VD errors;
+        VD ranks;
         int corrCount = 0;
         for (Entry e : test) {
             int testId = e.id;
             double testDv = e.dv;
             double dvSum = 0;
             double wSum = 0;
+            double maxSim = -100000;
+            double maxRank = -1;
 
             for (Entry trEntry : training) {
                 double sim = matrix[testId][trEntry.id];
@@ -896,7 +944,13 @@ private:
                     dvSum += sim * trEntry.dv;
                     wSum += sim;
                 }
+                if (sim > maxSim) {
+                    maxSim = sim;
+                    maxRank = gtfRank[trEntry.id];
+                }
             }
+            
+            ranks.PB(maxRank);
             
             double corr = 0;
             double err = 0;
@@ -924,7 +978,7 @@ private:
                 yMin = testDv;
             }
 
-            if (LOG_DEBUG) cerr << "Entry: " << testId <<  " testDV: " << testDv <<  ", correction: " << corr << ", dvSum: " << dvSum << ", weights: " <<  wSum << endl;
+            if (LOG_DEBUG) cerr << "Entry: " << testId <<  " testDV: " << testDv <<  ", correction: " << corr << ", dvCoef: " << err << ", dvSum: " << dvSum << ", weights: " <<  wSum << endl;
         }
         
         // -1 to compensate last iteration
@@ -945,20 +999,25 @@ private:
             double testDv = e.dv;
             double correction = corrections[index];
             double dvCoef = errors[index];
+//
+//            if (correction != 0) {
+//            
+//                double diff = testDv - correction;
+//                if (abs(diff) < nrmse) {
+//                    testDv += correction;
+//                    
+//                    corrCount++;
+//                    
+//                    if (LOG_DEBUG)
+//                        cerr << "Entry: " << testId << " corrected with value: " << testDv << ", dvCoef: " << dvCoef <<  ", correction: " << correction << " diff: " << diff << endl;
+//                }
+//            }
             
-            if (correction != 0) {
+            // update from rank
+            testDv = ranks[index] * correction;
+            if (LOG_DEBUG)
+                cerr << "Entry: " << testId << " corrected with value: " << testDv << endl;
             
-                double diff = dvCoef - correction;
-                if (abs(diff) < nrmse) {
-                    testDv += correction;
-//                    testDv += diff;
-                    
-                    corrCount++;
-                    
-                    if (LOG_DEBUG)
-                        cerr << "Entry: " << testId << " corrected with value: " << testDv << ", dvCoef: " << dvCoef <<  ", correction: " << correction << " diff: " << diff << endl;
-                }
-            }
             index++;
             
             
