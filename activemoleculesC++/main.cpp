@@ -204,6 +204,11 @@ struct Node {
         m_terminal_left = value_left;
         m_terminal_right = value_right;
     }
+    
+private:
+    
+    Node(Node const &); // non construction-copyable
+    Node& operator=(Node const &); // non copyable
 };
 
 struct BestSplit {
@@ -608,8 +613,8 @@ public:
             return re_res;
         }
         
-        for (const RegressionTree tree : m_trees) {
-            re_res += m_combine_weight * tree.predict(feature_x);
+        for (int i = 0; i < m_trees.size(); i++) {
+            re_res += m_combine_weight * m_trees[i].predict(feature_x);
         }
         
         return re_res;
@@ -832,17 +837,17 @@ class ActiveMolecules {
         // correct training data
         int count = 0;
         for (int i = 0; i < X; i++) {
-            Entry e = training[i];
-            if (e.dv == Entry::NVL || e.dv == 0) {
+            if (training[i].dv == Entry::NVL || training[i].dv == 0) {
                 // set entry DV using its similarity
                 double dvSum = 0;
                 double wSum = 0;
                 
-                for (Entry trEntry : training) {
-                    double sim = matrix[e.id][trEntry.id];
-                    if (trEntry.dv != Entry::NVL && e.id != trEntry.id) {
-                        dvSum += sim * trEntry.dv;
-                        wSum += sim;
+                // go through the row of similar entries
+                for (int j = 0; j < X; j++) {
+                    double sim = matrix[training[i].id][training[j].id];
+                    if (training[j].dv != Entry::NVL && training[i].id != training[j].id) {
+                        dvSum += sim * training[j].dv;
+                        wSum++;// += sim;
                     }
                 }
                 training[i].dv = dvSum / wSum;
@@ -855,11 +860,11 @@ class ActiveMolecules {
         // prepare data
         VC<VD> input_x;
         VD input_y;
-        for (Entry e : training) {
-            if (e.dv != Entry::NVL) {
+        for (int i = 0; i < X; i++) {
+            if (training[i].dv != Entry::NVL) {
                 // check for DV set only for training data and add TEST data without checks
-                input_x.PB(e.features);
-                input_y.PB(e.dv);
+                input_x.PB(training[i].features);
+                input_y.PB(training[i].dv);
             } else if (LOG_DEBUG){
 //                cerr << "Entry id: " << e.id << " missing DV" << endl;
             }
@@ -871,7 +876,7 @@ class ActiveMolecules {
         // do pass
         
         //----------------------------------------------------
-        int pass_num = 25;//9;
+        int pass_num = 15;//25;//9;
         
         GBTConfig conf;
         conf.sampling_size_ratio = 0.5;
@@ -879,8 +884,7 @@ class ActiveMolecules {
         conf.tree_min_nodes = 22;
         conf.tree_depth = 3;
         conf.tree_number = 22;
-        
-        double simSplit = 0.0;//0.8;
+
         //----------------------------------------------------
         
         VC<VC<Entry>>passRes;
@@ -900,9 +904,8 @@ class ActiveMolecules {
             double meanDv = 0;
             int id = 0;
             for (int j = 0; j < pass_num; j++) {
-                Entry res_entry = passRes[j][i];
-                id = res_entry.id;
-                meanDv += res_entry.dv;
+                id = passRes[j][i].id;
+                meanDv += passRes[j][i].dv;
             }
             meanDv /= pass_num;
             Entry mean_entry(id);
@@ -918,10 +921,10 @@ class ActiveMolecules {
         sort(meanResults.rbegin(), meanResults.rend());
         
         VI ids;
-        for (Entry e : meanResults) {
-            if (LOG_DEBUG) cerr << "ID: " << e.id << ", activity: " << e.dv << endl;
+        for (int i = 0; i < Y; i++) {
+            if (LOG_DEBUG) cerr << "ID: " << meanResults[i].id << ", activity: " << meanResults[i].dv << endl;
             
-            ids.PB(e.id);
+            ids.PB(meanResults[i].id);
         }
         
         cerr << "pass_num: " << pass_num << ", learning_rate: " << conf.learning_rate << ", tree_min_nodes: " << conf.tree_min_nodes
@@ -941,9 +944,8 @@ private:
         // predict
         int test_N = testing.size();
         for (int i = 0; i < test_N; i++) {
-            Entry testEntry = testing[i];
-            Entry resEntry(testEntry.id);
-            resEntry.dv = predictor->predict(testEntry.features);
+            Entry resEntry(testing[i].id);
+            resEntry.dv = predictor->predict(testing[i].features);
             rank.PB(resEntry);
         }
     }
