@@ -88,6 +88,7 @@ struct Entry {
     VD features;
     double dv;
     string formula;
+    bool completeFeatures = true;
     
     static double parse(const string &s) {
         return s == "" ? NVL : atof(s.c_str());
@@ -104,7 +105,11 @@ struct Entry {
             if (i == 14) {
                 formula = vs[i];
             } else {
-                features.PB(parse(vs[i]));
+                double f = parse(vs[i]);
+                features.PB(f);
+                if (f == NVL) {
+                    completeFeatures = false;
+                }
             }
         }
 
@@ -656,10 +661,10 @@ public:
      * @param input_x the input features
      * @param input_y the ground truth values - one per features row
      */
-    ResultFunction fitGradientBoostingTree(const VC<VD> &input_x, const VD &input_y) {
+    ResultFunction *fitGradientBoostingTree(const VC<VD> &input_x, const VD &input_y) {
         
         // initialize the final result
-        ResultFunction res_fun(m_learning_rate);
+        ResultFunction *res_fun = new ResultFunction(m_learning_rate);
         
         // get the feature dimension
         int feature_num = input_y.size();
@@ -672,7 +677,7 @@ public:
             mean_y += d;
         }
         mean_y = mean_y / feature_num;
-        res_fun.m_init_value = mean_y;
+        res_fun->m_init_value = mean_y;
         
         
         // prepare the iteration
@@ -739,7 +744,7 @@ public:
                     continue;
                 }
                 
-                res_fun.m_trees.PB(tree);
+                res_fun->m_trees.PB(tree);
                 
                 // update h_value information, prepare for the next iteration
                 int sel_index = 0;
@@ -769,7 +774,7 @@ public:
                     break;
                 }
                 // store tree information
-                res_fun.m_trees.PB(tree);
+                res_fun->m_trees.PB(tree);
                 
                 // update h_value information, prepare for the next iteration
                 for (int loop_index = 0; loop_index < feature_num; loop_index++) {
@@ -794,7 +799,6 @@ class ActiveMolecules {
     int Y;
     int M;
     VC<VD>matrix;
-    VI gtfRank;
     
     public:
     
@@ -825,28 +829,58 @@ class ActiveMolecules {
         
         assert(training.size() == X && testing.size() == Y);
         
+        // correct training data
+        int count = 0;
+        double maxDv = -10000;
+        double minDv = 10000;
+        for (int i = 0; i < X; i++) {
+            Entry e = training[i];
+            if (e.dv == Entry::NVL || e.dv == 0) {
+                // set entry DV using its similarity
+                double dvSum = 0;
+                double wSum = 0;
+                double maxSim = -100000;
+                double maxRank = 0;
+                
+                for (Entry trEntry : training) {
+                    double sim = matrix[e.id][trEntry.id];
+                    if (trEntry.dv != Entry::NVL && e.id != trEntry.id) {
+                        dvSum += sim * trEntry.dv;
+                        wSum += sim;
+                        
+                        if (sim > maxSim && trEntry.dv != 0) {
+                            maxSim = sim;
+                            maxRank = sim * trEntry.dv;
+                        }
+                    }
+                }
+                training[i].dv = dvSum / wSum;
+                count++;
+            }
+            
+//            cerr << "Entry id: " << e.id << " DV: " << e.dv << endl;
+            // find max/min
+            if (training[i].dv > maxDv) {
+                maxDv = training[i].dv;
+            }
+            if (training[i].dv < minDv) {
+                minDv = training[i].dv;
+            }
+        }
+        double diffDv = maxDv - minDv;
+        cerr << "Corrected: " << count << ", maxDv: " << maxDv << ", minDv: " << minDv << ", diffDv: " << diffDv << endl;
+        
         // prepare data
         VC<VD> input_x;
         VD input_y;
         for (Entry e : training) {
-            if (e.dv > Entry::NVL) {
+            if (e.dv != Entry::NVL) {
                 // check for DV set only for training data and add TEST data without checks
                 input_x.PB(e.features);
                 input_y.PB(e.dv);
             } else if (LOG_DEBUG){
 //                cerr << "Entry id: " << e.id << " missing DV" << endl;
             }
-        }
-        
-        // create ground truth ranked list
-        for (int i = 0; i < X; i++) {
-            int rankI = 0;
-            for (int j = 0; j < X; j++) {
-                if (i != j) {
-                    if (input_y[j] > input_y[i]) rankI++;
-                }
-            }
-            gtfRank.PB(rankI);
         }
         
         if (LOG_DEBUG) cerr << "Real train size: " << input_x.size() << endl;
@@ -864,7 +898,7 @@ class ActiveMolecules {
         conf.tree_depth = 3;
         conf.tree_number = 22;
         
-        double simSplit = 0.0;//0.65;//0.8;
+        double simSplit = 0.3;//0.8;
         //----------------------------------------------------
         
         VC<VC<Entry>>passRes;
@@ -895,24 +929,25 @@ class ActiveMolecules {
         }
         
         // correct by similarity
-        VC<Entry> simResults;
-        correctBySimilarity(training, meanResults, simSplit, simResults);
+//        VC<Entry> simResults;
+//        correctBySimilarity(training, meanResults, simSplit, simResults);
         
         double finishTime = getTime();
         
         if (LOG_DEBUG) cerr << "++++ OUT ++++" << endl;
         
         // sort to have highest rating at the top
-        sort(simResults.begin(), simResults.end());
+        sort(meanResults.rbegin(), meanResults.rend());
         
         VI ids;
-        for (Entry e : simResults) {
+        for (Entry e : meanResults) {
             if (LOG_DEBUG) cerr << "ID: " << e.id << ", activity: " << e.dv << endl;
             
             ids.PB(e.id);
         }
         
-        cerr << "pass_num: " << pass_num << ", learning_rate: " << conf.learning_rate << ", tree_number: " << conf.tree_number << ", split: " << simSplit << endl;
+        cerr << "pass_num: " << pass_num << ", learning_rate: " << conf.learning_rate << ", tree_min_nodes: " << conf.tree_min_nodes
+        << ", tree_depth: " << conf.tree_depth <<  ", tree_number: " << conf.tree_number << endl;
         cerr << "Rank time: " << rankTime - startTime << ", full time: " << finishTime - startTime << endl;
         
         return ids;
@@ -936,17 +971,18 @@ private:
             double dvSum = 0;
             double wSum = 0;
             double maxSim = -100000;
-            double maxRank = -1;
+            double maxRank = 0;
 
             for (Entry trEntry : training) {
                 double sim = matrix[testId][trEntry.id];
-                if (trEntry.dv > Entry::NVL && sim > simSplit) {
+                if (trEntry.dv != Entry::NVL && sim > simSplit) {
                     dvSum += sim * trEntry.dv;
                     wSum += sim;
-                }
-                if (sim > maxSim) {
-                    maxSim = sim;
-                    maxRank = gtfRank[trEntry.id];
+                    
+                    if (sim > maxSim) {
+                        maxSim = sim;
+                        maxRank = sim * trEntry.dv;
+                    }
                 }
             }
             
@@ -998,25 +1034,19 @@ private:
             int testId = e.id;
             double testDv = e.dv;
             double correction = corrections[index];
-            double dvCoef = errors[index];
-//
-//            if (correction != 0) {
-//            
-//                double diff = testDv - correction;
-//                if (abs(diff) < nrmse) {
-//                    testDv += correction;
-//                    
-//                    corrCount++;
-//                    
-//                    if (LOG_DEBUG)
-//                        cerr << "Entry: " << testId << " corrected with value: " << testDv << ", dvCoef: " << dvCoef <<  ", correction: " << correction << " diff: " << diff << endl;
-//                }
-//            }
-            
-            // update from rank
-            testDv = ranks[index] * correction;
-            if (LOG_DEBUG)
-                cerr << "Entry: " << testId << " corrected with value: " << testDv << endl;
+            if (ranks[index] != 0) {
+                testDv *= ranks[index];
+                if (LOG_DEBUG)
+                    cerr << "Entry: " << testId << " corrected with value: " << testDv << ", dv correction: " << ranks[index] << endl;
+                
+                corrCount++;
+            } else if (correction != 0) {
+                testDv *= correction;
+                if (LOG_DEBUG)
+                    cerr << "Entry: " << testId << " corrected with value: " << testDv << ", weighted correction: " << correction << endl;
+                
+                corrCount++;
+            }
             
             index++;
             
@@ -1032,14 +1062,14 @@ private:
     void rank(const VC<VD> &input_x, const VD &input_y, const VC<Entry> &testing, const GBTConfig &conf, VC<Entry> &rank) {
         // train
         GradientBoostingTree tree(conf.sampling_size_ratio, conf.learning_rate, conf.tree_number, conf.tree_min_nodes, conf.tree_depth);
-        ResultFunction predictor = tree.fitGradientBoostingTree(input_x, input_y);
+        ResultFunction *predictor = tree.fitGradientBoostingTree(input_x, input_y);
         
         // predict
         int test_N = testing.size();
         for (int i = 0; i < test_N; i++) {
             Entry testEntry = testing[i];
             Entry resEntry(testEntry.id);
-            resEntry.dv = predictor.predict(testEntry.features);
+            resEntry.dv = predictor->predict(testEntry.features);
             rank.PB(resEntry);
         }
     }
