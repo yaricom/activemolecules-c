@@ -831,44 +831,26 @@ class ActiveMolecules {
         
         // correct training data
         int count = 0;
-        double maxDv = -10000;
-        double minDv = 10000;
         for (int i = 0; i < X; i++) {
             Entry e = training[i];
             if (e.dv == Entry::NVL || e.dv == 0) {
                 // set entry DV using its similarity
                 double dvSum = 0;
                 double wSum = 0;
-                double maxSim = -100000;
-                double maxRank = 0;
                 
                 for (Entry trEntry : training) {
                     double sim = matrix[e.id][trEntry.id];
                     if (trEntry.dv != Entry::NVL && e.id != trEntry.id) {
                         dvSum += sim * trEntry.dv;
                         wSum += sim;
-                        
-                        if (sim > maxSim && trEntry.dv != 0) {
-                            maxSim = sim;
-                            maxRank = sim * trEntry.dv;
-                        }
                     }
                 }
                 training[i].dv = dvSum / wSum;
+                
                 count++;
             }
-            
-//            cerr << "Entry id: " << e.id << " DV: " << e.dv << endl;
-            // find max/min
-            if (training[i].dv > maxDv) {
-                maxDv = training[i].dv;
-            }
-            if (training[i].dv < minDv) {
-                minDv = training[i].dv;
-            }
         }
-        double diffDv = maxDv - minDv;
-        cerr << "Corrected: " << count << ", maxDv: " << maxDv << ", minDv: " << minDv << ", diffDv: " << diffDv << endl;
+        cerr << "Corrected: " << count << endl;
         
         // prepare data
         VC<VD> input_x;
@@ -889,7 +871,7 @@ class ActiveMolecules {
         // do pass
         
         //----------------------------------------------------
-        int pass_num = 9;
+        int pass_num = 25;//9;
         
         GBTConfig conf;
         conf.sampling_size_ratio = 0.5;
@@ -898,7 +880,7 @@ class ActiveMolecules {
         conf.tree_depth = 3;
         conf.tree_number = 22;
         
-        double simSplit = 0.3;//0.8;
+        double simSplit = 0.0;//0.8;
         //----------------------------------------------------
         
         VC<VC<Entry>>passRes;
@@ -928,10 +910,6 @@ class ActiveMolecules {
             meanResults.PB(mean_entry);
         }
         
-        // correct by similarity
-//        VC<Entry> simResults;
-//        correctBySimilarity(training, meanResults, simSplit, simResults);
-        
         double finishTime = getTime();
         
         if (LOG_DEBUG) cerr << "++++ OUT ++++" << endl;
@@ -954,110 +932,6 @@ class ActiveMolecules {
     }
     
 private:
-    
-    void correctBySimilarity(const VC<Entry> &training, const VC<Entry> &test, double simSplit, VC<Entry> &simResults) {
-        // calculate MSE
-        double mae = 0;
-        double mse = 0;
-        double yMax = -10000;
-        double yMin = 10000;
-        VD corrections;
-        VD errors;
-        VD ranks;
-        int corrCount = 0;
-        for (Entry e : test) {
-            int testId = e.id;
-            double testDv = e.dv;
-            double dvSum = 0;
-            double wSum = 0;
-            double maxSim = -100000;
-            double maxRank = 0;
-
-            for (Entry trEntry : training) {
-                double sim = matrix[testId][trEntry.id];
-                if (trEntry.dv != Entry::NVL && sim > simSplit) {
-                    dvSum += sim * trEntry.dv;
-                    wSum += sim;
-                    
-                    if (sim > maxSim) {
-                        maxSim = sim;
-                        maxRank = sim * trEntry.dv;
-                    }
-                }
-            }
-            
-            ranks.PB(maxRank);
-            
-            double corr = 0;
-            double err = 0;
-            if (wSum > 0) {
-                corr = dvSum / wSum;
-                
-                double ae = abs(testDv - corr);
-                mae += ae;
-                mse += ae * ae;
-                err = ae / testDv;
-                
-                if (corr != 0) corrCount++;
- 
-            }
-            // store for subsequent use
-            errors.PB(err);
-            corrections.PB(corr);
-            
-            
-            // find max/min
-            if (testDv > yMax) {
-                yMax = testDv;
-            }
-            if (testDv < yMin) {
-                yMin = testDv;
-            }
-
-            if (LOG_DEBUG) cerr << "Entry: " << testId <<  " testDV: " << testDv <<  ", correction: " << corr << ", dvCoef: " << err << ", dvSum: " << dvSum << ", weights: " <<  wSum << endl;
-        }
-        
-        // -1 to compensate last iteration
-        mae /= (corrCount - 1);
-        mse /= (corrCount - 1);
-        // root-mean-square deviation
-        double rmse = sqrt(mse);
-        // normalized root-mean-square deviation
-        double nrmse = rmse / (yMax - yMin);
-        
-        if (LOG_DEBUG) cerr << corrCount << " to be corrected" << endl;
-        if (LOG_DEBUG) cerr << "MAE: " << mae << ", MSE: " << mse << ", RMSE: " << rmse << ", NRSME: " << nrmse << ", Ymax/Ymin: " << yMax << "/" << yMin << endl;
-        
-        corrCount = 0;
-        int index = 0;
-        for (Entry e : test) {
-            int testId = e.id;
-            double testDv = e.dv;
-            double correction = corrections[index];
-            if (ranks[index] != 0) {
-                testDv *= ranks[index];
-                if (LOG_DEBUG)
-                    cerr << "Entry: " << testId << " corrected with value: " << testDv << ", dv correction: " << ranks[index] << endl;
-                
-                corrCount++;
-            } else if (correction != 0) {
-                testDv *= correction;
-                if (LOG_DEBUG)
-                    cerr << "Entry: " << testId << " corrected with value: " << testDv << ", weighted correction: " << correction << endl;
-                
-                corrCount++;
-            }
-            
-            index++;
-            
-            
-            Entry resEntry(testId);
-            resEntry.dv = testDv;
-            simResults.PB(resEntry);
-        }
-        
-        if (LOG_DEBUG) cerr << corrCount << " was corrected" << endl;
-    }
     
     void rank(const VC<VD> &input_x, const VD &input_y, const VC<Entry> &testing, const GBTConfig &conf, VC<Entry> &rank) {
         // train
