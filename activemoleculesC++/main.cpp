@@ -54,6 +54,7 @@ using namespace std;
 #define VS          VC < string >
 #define VVS         VC < VS >
 
+template<class T> void print(VC < T > v) {cerr << "[";if (v.S) cerr << v[0];FOR(i, 1, v.S) cerr << ", " << v[i];cerr << "]" << endl;}
 
 VS splt(string s, char c = ',') {
     VS all;
@@ -89,6 +90,9 @@ struct Entry {
     double dv;
     string formula;
     bool completeFeatures = true;
+    VI missedFeatures;
+    
+    bool important[fCount];
     
     static double parse(const string &s) {
         return s == "" ? NVL : atof(s.c_str());
@@ -96,20 +100,29 @@ struct Entry {
     
     Entry(int sId) {
         id = sId;
+        initImportanceVector();
     }
     
     Entry(int sId, const string &s) {
         id = sId;
+        initImportanceVector();
         VS vs = splt(s, ',');
+        int index = 0;
         REP(i, fCount) {
             if (i == 14) {
                 formula = vs[i];
             } else {
                 double f = parse(vs[i]);
-                features.PB(f);
-                if (f == NVL) {
-                    completeFeatures = false;
+                // check if feature marked as important
+                if (important[index]) {
+                    features.PB(f);
+                    if (f == NVL) {
+                        completeFeatures = false;
+                        // store missed feature
+                        missedFeatures.PB(index);
+                    }
                 }
+                index++;
             }
         }
 
@@ -127,6 +140,26 @@ struct Entry {
     
     bool operator < (const Entry& entry) const {
         return (dv < entry.dv);
+    }
+    
+private:
+    void initImportanceVector() {
+//        int indexes[] = {2, 7, 16, 18, 12, 11, 20, 1, 5}; // 902627.26
+//        int indexes[] = {3, 2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15, 17}; // 910678.93
+//        int indexes[] = {2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15}; // 910676.63
+//        int indexes[] = {2, 9, 7, 5, 16, 8, 11, 18, 12, 1, 14, 20, 6, 10, 15, 17, 19}; // 902973.90
+//        int indexes[] = {7, 2, 8, 9, 12, 6, 5, 16, 15, 14, 17, 10, 20, 11, 18, 0, 19, 1, 4, 3}; // 893954.08
+        
+        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19, 4}; // 901736.64
+//        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19};//899899.12
+        
+        
+        for (int i = 0; i < fCount; i++) important[i] = false;
+        
+        int sizeIn = (sizeof(indexes)/sizeof(*indexes));
+        for (int i = 0; i < sizeIn; i++) {
+            important[indexes[i]] = true;
+        }
     }
 };
 
@@ -783,8 +816,7 @@ public:
                 
                 // update h_value information, prepare for the next iteration
                 for (int loop_index = 0; loop_index < feature_num; loop_index++) {
-                    h_value[loop_index] += m_learning_rate *
-                    tree.predict(input_x[loop_index]);
+                    h_value[loop_index] += m_learning_rate * tree.predict(input_x[loop_index]);
                 }
             }
             
@@ -799,6 +831,52 @@ public:
     }
 };
 
+void imputation(VC<Entry> &entries) {
+    VD vals(Entry::fCount, 0);
+    VD counts(Entry::fCount, 0);
+    int size = entries.size();
+    // calculate mean for all features
+    for (int i = 0 ; i < size; i++) {
+        for (int j = 0; j < entries[i].features.size(); j++) {
+            if (entries[i].features[j] != Entry::NVL) {
+                vals[j] += entries[i].features[j];
+                counts[j] += 1;
+            }
+        }
+    }
+    for (int i = 0; i < vals.size(); i++) {
+        if (vals[i] && counts[i]) {
+            vals[i] = vals[i] / counts[i];
+        }
+    }
+    if (LOG_DEBUG) {
+        cerr << "Means =========" << endl;
+        print<double>(vals);
+        cerr << "Counts =========" << endl;
+        print<double>(counts);
+    }
+    
+    // correct missing features
+    int samplesCorrected = 0;
+    for (int i = 0 ; i < size; i++) {
+        if (!entries[i].completeFeatures) {
+            VI &missed = entries[i].missedFeatures;
+            for (int j = 0; j < missed.size(); j++) {
+                int missedIndex = missed[j];
+                entries[i].features[missedIndex] = vals[missedIndex];
+            }
+            entries[i].completeFeatures = true;
+            samplesCorrected++;
+            
+            if (LOG_DEBUG) {
+                cerr << "Feature: " << entries[i].id << " = ";
+                print<double>(entries[i].features);
+            }
+        }
+    }
+    if (LOG_DEBUG) cerr << "Samples corrected: " << samplesCorrected << endl;
+}
+
 class ActiveMolecules {
     int X;
     int Y;
@@ -808,8 +886,8 @@ class ActiveMolecules {
     public:
     
     int similarity(int moleculeID, VD &similarities) {
-        if (!matrix.S) {
-            M = matrix.S;
+        if (!matrix.size()) {
+            M = matrix.size();
         }
         VD row;
         for (double &d : similarities) {
@@ -832,10 +910,27 @@ class ActiveMolecules {
         parseData(train, 0, training);
         parseData(test, X, testing);
         
+        // join vectors
+        VC<Entry> fullSet;
+        fullSet.reserve( X + Y ); // preallocate memory
+        fullSet.insert( fullSet.end(), training.begin(), training.end() );
+        fullSet.insert( fullSet.end(), testing.begin(), testing.end() );
+        
+        // features imputation to correct missed values
+        imputation(fullSet);
+
+        // split vectors
+        training.erase(training.begin(), training.end());
+        training.insert(training.begin(), fullSet.begin(), fullSet.begin() + X);
+        
+        testing.erase(testing.begin(), testing.end());
+        testing.insert(testing.begin(), fullSet.begin() + X, fullSet.end());
+        
         assert(training.size() == X && testing.size() == Y);
         
         // correct training data
         int count = 0;
+        int missedFeaturesSamples = 0;
         for (int i = 0; i < X; i++) {
             if (training[i].dv == Entry::NVL || training[i].dv == 0) {
                 // set entry DV using its similarity
@@ -847,15 +942,21 @@ class ActiveMolecules {
                     double sim = matrix[training[i].id][training[j].id];
                     if (training[j].dv != Entry::NVL && training[i].id != training[j].id) {
                         dvSum += sim * training[j].dv;
-                        wSum++;// += sim;
+                        wSum += sim;
                     }
                 }
                 training[i].dv = dvSum / wSum;
+//                if (LOG_DEBUG) cerr << "Id: " << training[i].id << ", DV: " << training[i].dv << ", dvSum: " << dvSum << ", wSum:" << wSum << endl;
                 
                 count++;
             }
+            
+            if (!training[i].completeFeatures) {
+                missedFeaturesSamples++;
+            }
+            
         }
-        cerr << "Corrected: " << count << endl;
+        cerr << "Corrected: " << count << ", found samples with missed features: " << missedFeaturesSamples << endl;
         
         // prepare data
         VC<VD> input_x;
@@ -876,7 +977,7 @@ class ActiveMolecules {
         // do pass
         
         //----------------------------------------------------
-        int pass_num = 15;//25;//9;
+        int pass_num = 18;//15;
         
         GBTConfig conf;
         conf.sampling_size_ratio = 0.5;
