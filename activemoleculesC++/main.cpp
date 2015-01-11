@@ -150,16 +150,16 @@ private:
 //        int indexes[] = {2, 9, 7, 5, 16, 8, 11, 18, 12, 1, 14, 20, 6, 10, 15, 17, 19}; // 902973.90
 //        int indexes[] = {7, 2, 8, 9, 12, 6, 5, 16, 15, 14, 17, 10, 20, 11, 18, 0, 19, 1, 4, 3}; // 893954.08
         
-        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19, 4}; // 901736.64
-//        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19};//899899.12
+//        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19, 4}; // 901736.64
+        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19};//899899.12
         
         
-        for (int i = 0; i < fCount; i++) important[i] = false;
+        for (int i = 0; i < fCount; i++) important[i] = true;//false;
         
-        int sizeIn = (sizeof(indexes)/sizeof(*indexes));
-        for (int i = 0; i < sizeIn; i++) {
-            important[indexes[i]] = true;
-        }
+//        int sizeIn = (sizeof(indexes)/sizeof(*indexes));
+//        for (int i = 0; i < sizeIn; i++) {
+//            important[indexes[i]] = true;
+//        }
     }
 };
 
@@ -829,6 +829,81 @@ public:
         
         return res_fun;
     }
+    
+    ResultFunction *learnGradientBoostingRanker(const VC<VD> &input_x, const VC<VD> &input_y, const double tau) {
+        ResultFunction *res_fun = new ResultFunction(m_learning_rate);
+        
+        int feature_num = input_x.size();
+        
+        assert(feature_num == input_y.size() && feature_num > 0);
+        
+        VD h_value_x(feature_num, 0);
+        VD h_value_y(feature_num, 0);
+        
+        int iter_index = 0;
+        while (iter_index < m_tree_number) {
+            
+            // in the boosting ranker, randomly select half samples without replacement in each iteration
+            RandomSample sampler(feature_num, (int) (0.5 * feature_num));
+            
+            // get random index
+            VI sampled_index = sampler.get_sample_index();
+            
+            VC<VD> gradient_x;
+            VD gradient_y;
+            
+            for (int i = 0; i < sampled_index.size(); i++) {
+                int sel_index = sampled_index[i];
+                
+                gradient_x.PB(input_x[sel_index]);
+                gradient_x.PB(input_y[sel_index]);
+                
+                // get sample data
+                if (h_value_x[sel_index] < h_value_y[sel_index] + tau) {
+                    double neg_gradient = h_value_y[sel_index] + tau - h_value_x[sel_index];
+                    gradient_y.PB(neg_gradient);
+                    gradient_y.PB(-1 * neg_gradient);
+                } else {
+                    gradient_y.PB(0.0);
+                    gradient_y.PB(0.0);
+                }
+//                cerr << "sel_index: " << sel_index << endl;
+            }
+            
+            // fit a regression tree
+            RegressionTree tree;
+            //tree.set_type(TerminalType.MAXIMAL);
+            
+            tree.buildRegressionTree(gradient_x, gradient_y);
+            
+            // store tree information
+            if (tree.m_root == NULL) {
+                continue;
+            }
+            
+            // update information
+            res_fun->m_trees.PB(tree);
+            
+            double err = 0.0;
+            
+            for (int loop_index = 0; loop_index < feature_num; loop_index++) {
+                h_value_x[loop_index] += m_learning_rate * tree.predict(input_x[loop_index]);
+                h_value_y[loop_index] += m_learning_rate * tree.predict(input_y[loop_index]);
+                
+                if (h_value_x[loop_index] < h_value_y[loop_index] + tau) {
+                    err += (h_value_x[loop_index] - h_value_y[loop_index] - tau) *
+                    (h_value_x[loop_index] - h_value_y[loop_index] - tau);
+                }
+            }
+            if (LOG_DEBUG) cerr << iter_index + 1 << "-th iteration with error " << err << endl;
+            
+            iter_index += 1;
+        }
+        
+        
+        
+        return res_fun;
+    }
 };
 
 void imputation(VC<Entry> &entries) {
@@ -928,35 +1003,35 @@ class ActiveMolecules {
         
         assert(training.size() == X && testing.size() == Y);
         
-        // correct training data
-        int count = 0;
-        int missedFeaturesSamples = 0;
-        for (int i = 0; i < X; i++) {
-            if (training[i].dv == Entry::NVL || training[i].dv == 0) {
-                // set entry DV using its similarity
-                double dvSum = 0;
-                double wSum = 0;
-                
-                // go through the row of similar entries
-                for (int j = 0; j < X; j++) {
-                    double sim = matrix[training[i].id][training[j].id];
-                    if (training[j].dv != Entry::NVL && training[i].id != training[j].id) {
-                        dvSum += sim * training[j].dv;
-                        wSum += sim;
-                    }
-                }
-                training[i].dv = dvSum / wSum;
-//                if (LOG_DEBUG) cerr << "Id: " << training[i].id << ", DV: " << training[i].dv << ", dvSum: " << dvSum << ", wSum:" << wSum << endl;
-                
-                count++;
-            }
-            
-            if (!training[i].completeFeatures) {
-                missedFeaturesSamples++;
-            }
-            
-        }
-        cerr << "Corrected: " << count << ", found samples with missed features: " << missedFeaturesSamples << endl;
+//        // correct training data
+//        int count = 0;
+//        int missedFeaturesSamples = 0;
+//        for (int i = 0; i < X; i++) {
+//            if (training[i].dv == Entry::NVL || training[i].dv == 0) {
+//                // set entry DV using its similarity
+//                double dvSum = 0;
+//                double wSum = 0;
+//                
+//                // go through the row of similar entries
+//                for (int j = 0; j < X; j++) {
+//                    double sim = matrix[training[i].id][training[j].id];
+//                    if (training[j].dv != Entry::NVL && training[i].id != training[j].id) {
+//                        dvSum += sim * training[j].dv;
+//                        wSum += sim;
+//                    }
+//                }
+//                training[i].dv = dvSum / wSum;
+////                if (LOG_DEBUG) cerr << "Id: " << training[i].id << ", DV: " << training[i].dv << ", dvSum: " << dvSum << ", wSum:" << wSum << endl;
+//                
+//                count++;
+//            }
+//            
+//            if (!training[i].completeFeatures) {
+//                missedFeaturesSamples++;
+//            }
+//            
+//        }
+//        cerr << "Corrected: " << count << ", found samples with missed features: " << missedFeaturesSamples << endl;
         
         // prepare data
         VC<VD> input_x;
@@ -977,7 +1052,7 @@ class ActiveMolecules {
         // do pass
         
         //----------------------------------------------------
-        int pass_num = 18;//15;
+        int pass_num = 6;//18;//15;
         
         GBTConfig conf;
         conf.sampling_size_ratio = 0.5;
@@ -1038,9 +1113,21 @@ class ActiveMolecules {
 private:
     
     void rank(const VC<VD> &input_x, const VD &input_y, const VC<Entry> &testing, const GBTConfig &conf, VC<Entry> &rank) {
+        VC<VD> input_yy;
+        int feature_dim = input_x[0].size();
+        for (double y : input_y) {
+            VD yList;
+            for (int i = 0; i < feature_dim; i++) {
+                yList.PB(y);
+            }
+            
+            input_yy.PB(yList);
+        }
+        
         // train
         GradientBoostingTree tree(conf.sampling_size_ratio, conf.learning_rate, conf.tree_number, conf.tree_min_nodes, conf.tree_depth);
-        ResultFunction *predictor = tree.fitGradientBoostingTree(input_x, input_y);
+//        ResultFunction *predictor = tree.fitGradientBoostingTree(input_x, input_y);
+        ResultFunction *predictor = tree.learnGradientBoostingRanker(input_x, input_yy, .21);
         
         // predict
         int test_N = testing.size();
