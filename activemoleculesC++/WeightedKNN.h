@@ -9,8 +9,19 @@
 #ifndef activemoleculesC___WeightedKNN_h
 #define activemoleculesC___WeightedKNN_h
 
+//===============================
+//xx is the total number of attributes in the data set INCLUDING the class attribute
+//#define NO_OF_ATT xx
+//yy is the number of classes
+//#define NO_OF_CLASSES yy
+//==============================
+
+//
 // The active molecules data
+//
+//xx is the total number of attributes in the data set INCLUDING the class attribute
 #define NO_OF_ATT 22
+//yy is the number of classes
 #define NO_OF_CLASSES 51
 
 //The Heart Data Set
@@ -52,15 +63,15 @@ extern double attWeights[];
 class TrainingExample
 {
 public:
-    //Unique Index
+    // Unique Index
     uint index;
-    //Values of all Attributes for a instance
+    // Values of all Attributes for an instance
     double Value [NO_OF_ATT];
-    //Euclidean Distance
+    // Euclidean Distance
     double Distance;
-    //Instance Weight
+    // Instance Weight
     double Weight;
-    //Is the instance near to anyone
+    // Is the instance near to anyone
     bool isNearest2AtleastSome;
     
     TrainingExample()
@@ -147,6 +158,43 @@ float BackwardElimination (TRAINING_EXAMPLES_LIST *trainList,
                            int trainExamples,
                            TRAINING_EXAMPLES_LIST *testList,
                            int testExamples);
+
+/////////////////////////////KNN Algorithm Classifiers//////////////////////////
+/**
+ * Do classification by Attribute Weighted K Nearest Neighbor Algorithm
+ * and returns list of classes in the same order as in test list examples
+ *
+ * trainList - List of training examples
+ * testList - List of testing examples
+ */
+std::vector<int>classifyBySimpleAttributeWKNN (TRAINING_EXAMPLES_LIST *trainList,
+                                               TRAINING_EXAMPLES_LIST *testList);
+
+/**
+ * Do classification by K Nearest Neighbor Algorithm (All attributes treated equally)
+ * and returns list of classes in the same order as in test list examples
+ *
+ * trainList - List of training examples
+ * testList - List of testing examples
+ */
+std::vector<int>classifyBySimpleKNN (TRAINING_EXAMPLES_LIST *trainList,
+                                     TRAINING_EXAMPLES_LIST *testList);
+/**
+ * Do classification by Instance Weighted K Nearest Neighbor Algorithm
+ * and returns list of classes in the same order as in test list examples
+ *
+ * trainList - List of training examples
+ * testList - List of testing examples
+ */
+std::vector<int>classifyByInstanceWKNN (TRAINING_EXAMPLES_LIST *trainList,
+                                        TRAINING_EXAMPLES_LIST *testList);
+
+/**
+ * Do classification by K Nearest Neighbor Algorithm with Backward Elimination 
+ * and returns list of classes in the same order as in test list examples
+ */
+std::vector<int>classifyByKNNBackwardElimination (TRAINING_EXAMPLES_LIST *trainList,
+                                                  TRAINING_EXAMPLES_LIST *testList);
 ///////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////
@@ -184,9 +232,6 @@ int TestKNN (TRAINING_EXAMPLES_LIST *tlist, TRAINING_EXAMPLES_LIST data,
 bool readData4File (char *filename,
                     TRAINING_EXAMPLES_LIST *rlist,
                     int *rlistExamples);
-
-/* Utility function to read line from a file. */
-int GetLine (char *line, int max, FILE *fp);
 
 /* Comparison function used during sorting data. */
 bool compare(const TrainingExample t1, const TrainingExample t2);
