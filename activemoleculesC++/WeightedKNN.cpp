@@ -23,6 +23,16 @@ void printExample(TrainingExample &example) {
     cerr << "]" << endl;
 }
 
+void printExamples(TRAINING_EXAMPLES_LIST &data) {
+    TRAINING_EXAMPLES_LIST::iterator testIter;
+    TrainingExample tmpTestObj;
+    
+    for (testIter = data.begin(); testIter != data.end(); ++testIter) {
+        tmpTestObj = *testIter;
+        printExample(tmpTestObj);
+    }
+}
+
 void BackwardEliminationInit ();
 void InitAttWeights ();
 
@@ -133,44 +143,318 @@ float BackwardElimination (TRAINING_EXAMPLES_LIST *trainList,
                    mode, isBackwardElim, isAttrWKNN);
     accuracy = (float)(((float)CCI/(float)trainExamples)*100);
     
-    cerr<< "Initial Accuracy on training data with "<<NO_OF_ATT-1
-    <<" attributes = "<<accuracy<<"%"<<endl;
+    cerr << "Initial Accuracy on training data with " << NO_OF_ATT - 1
+    << " attributes = " << accuracy << "%" <<endl;
     
-    for(int i = 0; i < NO_OF_ATT - 1; i++)
-    {
+    for (int i = 0; i < NO_OF_ATT - 1; i++) {
         /* Delete one attribute at a time.                      */
         /* If the accuracy has decreased restore the attribute  */
         /* else let the attribute remain deleted.               */
         isBEAttIncluded[i] = false;
         CCI = TestKNN (trainList, *trainList, isInstanceWKNN,
                        mode, isBackwardElim, isAttrWKNN);
-        float tmpAcc = (float)(((float)CCI/(float)trainExamples)*100);
-        if(tmpAcc >= accuracy)
-        {
+        float tmpAcc = (float)(((float)CCI/(float)trainExamples) * 100);
+        if(tmpAcc >= accuracy) {
             accuracy = tmpAcc;
             noOfAttDeleted++;
-        }
-        else
+            cerr << "Attribute " << i << " irrelevant and removed!" <<endl;
+        } else {
             isBEAttIncluded[i] = true;
+        }
     }
     
-    cerr<<"Backward Elimination achieves "<<accuracy<<"% accuracy with "
-    <<NO_OF_ATT-1-noOfAttDeleted<<" attributes \n on training data."<<endl;
+    cerr << "Backward Elimination achieves " << accuracy << "% accuracy with "
+    << NO_OF_ATT - 1 - noOfAttDeleted << " attributes \n on training data." <<endl;
+    
     
     /* Test KNN again with eliminated attributes on the test data. */
-    CCI = TestKNN (trainList, *testList, isInstanceWKNN,
-                   mode, isBackwardElim, isAttrWKNN);
+    CCI = TestKNN (trainList, *testList, isInstanceWKNN, mode, isBackwardElim, isAttrWKNN);
     accuracy = (float)(((float)CCI/(float)testExamples)*100);
     
     cerr<<"Number of Testing Examples       # "<<testExamples<<endl;
     cerr<<"K used                           = "<<K<<endl;
     cerr<<"Correctly Classified Instances   # "<<CCI<<endl;
     cerr<<"Incorrectly Classified Instances # "<<testExamples - CCI<<endl;
-    cerr<<"Backward Elimination achieves "<<accuracy<<"% accuracy with "
-    <<NO_OF_ATT-1-noOfAttDeleted<<" attributes \n on testing data."<<endl;
+    cerr<<"Backward Elimination achieves " <<accuracy << "% accuracy with "
+    << NO_OF_ATT - 1 - noOfAttDeleted << " attributes \n on testing data." <<endl;
     cerr<<"------------------------------------------------------------"<<endl;
     
     return accuracy;
+}
+
+/////////////////////////////KNN Algorithm Classifiers//////////////////////////
+/**
+ * Do classification by Attribute Weighted K Nearest Neighbor Algorithm
+ * and returns list of classes in the same order as in test list examples
+ *
+ * trainList - List of training examples
+ * testList - List of testing examples
+ */
+std::vector<int>classifyBySimpleAttributeWKNN (TRAINING_EXAMPLES_LIST *trainList,
+                                               TRAINING_EXAMPLES_LIST *testList) {
+    int trainExamples = trainList->size();
+    int testExamples = testList->size();
+    
+    int no_of_iterations	= 25;
+    int desiredAccuracy		= 85;
+    bool isAttrWKNN			= true;
+    bool isInstanceWKNN		= false;
+    bool isBackwardElim		= false;
+    
+    cerr<<endl<< "Starting Attribute Weighted KNN classifier" <<endl;
+    cerr<<"------------------------------------------------------------"<<endl;
+    cerr << "Training data size: " << trainExamples << ", test data size: " << testExamples << endl;
+    
+    //
+    // Do train
+    //
+    
+    /* Every attribute is associated with a weight. */
+    /* Initialize the weights with random values.   */
+    InitAttWeights ();
+    
+    /* Learn weights by cross validation (3 fold) on training set */
+    float accuracy = CrossValidate (trainList, no_of_iterations,
+                                    trainExamples, isAttrWKNN);
+    
+    cerr << "CrossValidate accuracy: " << accuracy << endl;
+    
+    /* Learn weights on the whole training set */
+    no_of_iterations = 100;
+    LearnWeights (trainList, *trainList, no_of_iterations, trainExamples,
+                  TRAINING, desiredAccuracy, isAttrWKNN);
+    
+    //
+    // Do test
+    //
+    
+    MODE mode = TESTING;
+    TRAINING_EXAMPLES_LIST::iterator testIter;
+    TrainingExample tmpTestObj;
+    uint index[K];
+    std::vector<int>classes;
+    
+    for (testIter = testList->begin(); testIter != testList->end(); ++testIter) {
+        tmpTestObj = *testIter;
+        /* Predict the class for the query point */
+        int predictedClass = PredictByKNN(trainList, tmpTestObj.Value, isInstanceWKNN,
+                                          index, mode, isBackwardElim, isAttrWKNN);
+        
+        cerr << "Entry id: " << tmpTestObj.index << ", predicted class: " << predictedClass <<endl;
+        
+        classes.push_back(predictedClass);
+    }
+
+    
+    cerr<<"-------Attribute Weighted-KNN---------------------------"<<endl;
+    cerr<<"Number of Training Examples      # "<<trainExamples<<endl;
+    cerr<<"Number of Testing Examples       # "<<testExamples<<endl;
+    cerr<<"K used                           = "<<K<<endl;
+    cerr<<"Classified classes Instances     # " << classes.size() <<endl;
+    cerr<<"--------------------------------------------------------"<<endl;
+    
+    return classes;
+}
+
+/**
+ * Do classification by K Nearest Neighbor Algorithm (All attributes treated equally)
+ * and returns list of classes in the same order as in test list examples
+ *
+ * trainList - List of training examples
+ * testList - List of testing examples
+ */
+std::vector<int>classifyBySimpleKNN (TRAINING_EXAMPLES_LIST *trainList,
+                                     TRAINING_EXAMPLES_LIST *testList) {
+    int trainExamples = trainList->size();
+    int testExamples = testList->size();
+    
+    bool isInstanceWKNN = false;
+    MODE mode			= TESTING;
+    bool isBackwardElim = false;
+    bool isAttrWKNN		= false;
+    
+    cerr<<endl<<"Simple KNN(Without Weights) classification"<<endl;
+    cerr<<"------------------------------------------------------------"<<endl;
+    cerr << "Training data size: " << trainExamples << ", test data size: " << testExamples << endl;
+    
+    TRAINING_EXAMPLES_LIST::iterator testIter;
+    TrainingExample tmpTestObj;
+    uint index[K];
+    std::vector<int>classes;
+    
+    for (testIter = testList->begin(); testIter != testList->end(); ++testIter) {
+        tmpTestObj = *testIter;
+        /* Predict the class for the query point */
+        int predictedClass = PredictByKNN(trainList, tmpTestObj.Value, isInstanceWKNN,
+                                          index, mode, isBackwardElim, isAttrWKNN);
+        
+        cerr << "Entry id: " << tmpTestObj.index << ", predicted class: " << predictedClass <<endl;
+        
+        classes.push_back(predictedClass);
+    }
+    
+    cerr<<"----------------------KNN----------------------"<<endl;
+    cerr<<"Number of Training Examples      # "<<trainExamples<<endl;
+    cerr<<"Number of Testing Examples       # "<<testExamples<<endl;
+    cerr<<"K used                           = "<<K<<endl;
+    cerr<<"Classified classes Instances     # " << classes.size() <<endl;
+    cerr<<"-----------------------------------------------"<<endl<<endl;
+    
+    return classes;
+    
+}
+
+/**
+ * Do classification by Instance Weighted K Nearest Neighbor Algorithm
+ * and returns list of classes in the same order as in test list examples
+ *
+ * trainList - List of training examples
+ * testList - List of testing examples
+ */
+std::vector<int>classifyByInstanceWKNN (TRAINING_EXAMPLES_LIST *trainList,
+                                        TRAINING_EXAMPLES_LIST *testList) {
+    int trainExamples = trainList->size();
+    int testExamples = testList->size();
+    bool isInstanceWKNN		= true;
+    bool isBackwardElim		= false;
+    bool isAttrWKNN			= false;
+    int no_of_iterations	= 25;
+    int desiredAccuracy		= 50;//85;
+    
+    cerr<<endl<<"Starting Instance Weighted KNN classification"<<endl;
+    cerr<<"------------------------------------------------------------"<<endl;
+    cerr << "Training data size: " << trainExamples << ", test data size: " << testExamples << endl;
+    
+    //
+    // Do train
+    //
+    
+    /* Learn weights by cross validation (3 fold) on training set */
+    float accuracy = CrossValidate (trainList, no_of_iterations,
+                                    trainExamples, isAttrWKNN);
+    /* Learn weights on the training set */
+    LearnWeights (trainList, *trainList, no_of_iterations, trainExamples,
+                  TRAINING, desiredAccuracy, isAttrWKNN);
+    cerr << "Achieved cross validation accuracy: " << accuracy << endl;
+    
+    
+    //
+    // Do test
+    //
+    
+    MODE mode = TESTING;
+    TRAINING_EXAMPLES_LIST::iterator testIter;
+    TrainingExample tmpTestObj;
+    uint index[K];
+    std::vector<int>classes;
+    
+    for (testIter = testList->begin(); testIter != testList->end(); ++testIter) {
+        tmpTestObj = *testIter;
+        /* Predict the class for the query point */
+        int predictedClass = PredictByKNN(trainList, tmpTestObj.Value, isInstanceWKNN,
+                                          index, mode, isBackwardElim, isAttrWKNN);
+        
+        cerr << "Entry id: " << tmpTestObj.index << ", predicted class: " << predictedClass <<endl;
+        
+        classes.push_back(predictedClass);
+    }
+    
+    cerr<<"-------Instance Weighted-KNN----------------------------"<<endl;
+    cerr<<"Number of Training Examples      # "<<trainExamples<<endl;
+    cerr<<"Number of Testing Examples       # "<<testExamples<<endl;
+    cerr<<"K used                           = "<<K<<endl;
+    cerr<<"Classified classes Instances     # " << classes.size() <<endl;
+    cerr<<"--------------------------------------------------------"<<endl;
+    
+    return classes;
+}
+
+/**
+ * Do classification by K Nearest Neighbor Algorithm with Backward Elimination
+ * and returns list of classes in the same order as in test list examples
+ *
+ * trainList - List of training examples
+ * testList - List of testing examples
+ */
+std::vector<int>classifyByKNNBackwardElimination (TRAINING_EXAMPLES_LIST *trainList,
+                                                  TRAINING_EXAMPLES_LIST *testList) {
+    int trainExamples = trainList->size();
+    int testExamples = testList->size();
+    
+    float accuracy = 0.0f;
+    int CCI = 0;
+    int noOfAttDeleted = 0;
+    
+    bool isInstanceWKNN		= false;
+    MODE mode				= TESTING;
+    bool isBackwardElim		= true;
+    bool isAttrWKNN			= false;
+    
+    cerr << endl << "Starting Backward Elimination Classification" << endl;
+    cerr<<"------------------------------------------------------------"<<endl;
+    cerr << "Training data size: " << trainExamples << ", test data size: " << testExamples << endl;
+    
+    //
+    // Do training
+    //
+    
+    /* Initially all the attributes will be included in KNN */
+    BackwardEliminationInit ();
+    
+    /* Test KNN with all the attributes */
+    CCI = TestKNN (trainList, *trainList, isInstanceWKNN,
+                   mode, isBackwardElim, isAttrWKNN);
+    accuracy = (float)(((float)CCI/(float)trainExamples)*100);
+    
+    cerr << "Initial Accuracy on training data with " << NO_OF_ATT - 1
+    << " attributes = " << accuracy << "%" <<endl;
+    
+    for (int i = 0; i < NO_OF_ATT - 1; i++) {
+        /* Delete one attribute at a time.                      */
+        /* If the accuracy has decreased restore the attribute  */
+        /* else let the attribute remain deleted.               */
+        isBEAttIncluded[i] = false;
+        CCI = TestKNN (trainList, *trainList, isInstanceWKNN,
+                       mode, isBackwardElim, isAttrWKNN);
+        float tmpAcc = (float)(((float)CCI/(float)trainExamples) * 100);
+        if(tmpAcc >= accuracy) {
+            accuracy = tmpAcc;
+            noOfAttDeleted++;
+            cerr << "Attribute " << i << " is an irrelevant and was removed!" <<endl;
+        } else {
+            isBEAttIncluded[i] = true;
+        }
+    }
+    
+    cerr << "Backward Elimination achieves " << accuracy << "% accuracy with "
+    << NO_OF_ATT - 1 - noOfAttDeleted << " attributes on training data." <<endl;
+    
+    
+    //
+    // Do prediction
+    //
+    TRAINING_EXAMPLES_LIST::iterator testIter;
+    TrainingExample tmpTestObj;
+    uint index[K];
+    std::vector<int>classes;
+    
+    for (testIter = testList->begin(); testIter != testList->end(); ++testIter) {
+        tmpTestObj = *testIter;
+        /* Predict the class for the query point */
+        int predictedClass = PredictByKNN(trainList, tmpTestObj.Value, isInstanceWKNN,
+                                          index, mode, isBackwardElim, isAttrWKNN);
+        
+        cerr << "Entry id: " << tmpTestObj.index << ", predicted class: " << predictedClass <<endl;
+        
+        classes.push_back(predictedClass);
+    }
+    
+    cerr<<"Number of Testing Examples       # " << testExamples <<endl;
+    cerr<<"K used                           = " << K <<endl;
+    cerr<<"Classified classes Instances     # " << classes.size() <<endl;
+    cerr<<"------------------------------------------------------------"<<endl;
+    
+    return classes;
 }
 
 /*-----------------------------------------------------------------*/
@@ -252,8 +536,9 @@ int TestKNN (TRAINING_EXAMPLES_LIST *tlist, TRAINING_EXAMPLES_LIST data,
 //        cerr << "Entry id: " << tmpTestObj.index << ", predicted class: " << predictedClass <<endl;
         
         /* Count the number of correctly classified instances */
-        if (((int)(tmpTestObj.Value[NO_OF_ATT-1])) == predictedClass)
+        if ((int)tmpTestObj.Value[NO_OF_ATT - 1] == predictedClass) {
             correctlyClassifiedInstances ++;
+        }
     }
     return correctlyClassifiedInstances;
 }
@@ -272,17 +557,14 @@ void InitAttWeights ()
 /*------------------------------------------------------------------*/
 /* Normalize values by using mean and standard deviation            */
 /*------------------------------------------------------------------*/
-void NormalizeByStandardDeviation (TRAINING_EXAMPLES_LIST *trainList,
-                                   int trainExamples)
-{
-    for(int i = 0; i < NO_OF_ATT -1; i++)
-    {
+void NormalizeByStandardDeviation (TRAINING_EXAMPLES_LIST *trainList, int trainExamples) {
+    
+    for(int i = 0; i < NO_OF_ATT - 1; i++) {
         /* Find the mean */
         double mean = 0.0;
         TRAINING_EXAMPLES_LIST::iterator Iter;
         TrainingExample tmpTestObj;
-        for(Iter = trainList->begin(); Iter != trainList->end(); ++Iter)
-        {
+        for(Iter = trainList->begin(); Iter != trainList->end(); ++Iter) {
             tmpTestObj = *Iter;
             mean += tmpTestObj.Value[i];
         }
@@ -290,23 +572,22 @@ void NormalizeByStandardDeviation (TRAINING_EXAMPLES_LIST *trainList,
         
         /* Find the deviation */
         double deviation = 0.0;
-        for(Iter = trainList->begin(); Iter != trainList->end(); ++Iter)
-        {
+        for(Iter = trainList->begin(); Iter != trainList->end(); ++Iter) {
             tmpTestObj = *Iter;
             double val = mean - tmpTestObj.Value[i];
-            deviation += val*val;
+            deviation += val * val;
         }
         deviation = (deviation / (double)trainExamples);
         deviation = sqrt (deviation);
         
         /* Normalize the values */
-        for(Iter = trainList->begin(); Iter != trainList->end(); ++Iter)
-        {
+        for(Iter = trainList->begin(); Iter != trainList->end(); ++Iter) {
             tmpTestObj = *Iter;
             double val = (tmpTestObj.Value[i] - mean)/deviation;
             Iter->Value[i] = val;
         }
     }
+    
 }
 
 /*------------------------------------------------*/
@@ -361,29 +642,24 @@ int PredictByKNN (TRAINING_EXAMPLES_LIST *tlist, double *query,
         {
             if(isAttWeightedKNN)
             {
-                distance += (abs(query[j] - tmpObj.Value[j]) *
-                             abs(query[j] - tmpObj.Value[j])) *
-                (attWeights[j] * attWeights[j]);
+                distance += (abs(query[j] - tmpObj.Value[j]) * abs(query[j] - tmpObj.Value[j])) * (attWeights[j] * attWeights[j]);
             }
             else
             {
                 if(isBE)
                 {
                     if(isBEAttIncluded[j])
-                        distance += abs(query[j] - tmpObj.Value[j]) *
-                        abs(query[j] - tmpObj.Value[j]);
+                        distance += abs(query[j] - tmpObj.Value[j]) * abs(query[j] - tmpObj.Value[j]);
                 }
                 else
                 {
                     if(isWeightedKNN)
                     {
                         if(isBEAttIncluded[j])
-                            distance += abs(query[j] - tmpObj.Value[j]) *
-                            abs(query[j] - tmpObj.Value[j]);
+                            distance += abs(query[j] - tmpObj.Value[j]) * abs(query[j] - tmpObj.Value[j]);
                     }
                     else
-                        distance += abs(query[j] - tmpObj.Value[j]) *
-                        abs(query[j] - tmpObj.Value[j]);
+                        distance += abs(query[j] - tmpObj.Value[j]) * abs(query[j] - tmpObj.Value[j]);
                 }
             }
         }
@@ -719,4 +995,99 @@ bool compare(const TrainingExample t1, const TrainingExample t2)
         return true;
     else
         return false;
+}
+
+/*------------------------------------------------------------------------*/
+/* line - to read file fp line                                            */
+/* max - maximum line length to read                                      */
+/* fp - file to read from                                                 */
+/* Return Parameter: 0 if end of file, line length otherwise.             */
+/* Copies a file contents to another file.                                */
+/*------------------------------------------------------------------------*/
+int GetLine (char *line, int max, FILE *fp) {
+    if(fgets(line, max, fp)==NULL)
+        return 0;
+    else
+        return strlen(line);
+}
+
+/*-----------------------------------------------------------------*/
+/* filename - File from which the training/testing data is read    */
+/* rlist - The data structure that holds the training/test data    */
+/* rlistExamples - # of training/test examples                     */
+/*-----------------------------------------------------------------*/
+bool readData4File (char *filename, TRAINING_EXAMPLES_LIST *rlist,
+                    int *rlistExamples)
+{
+    FILE *fp = NULL;
+    int len = 0;
+    char line[LINE_MAX+1];
+    int lineSize = LINE_MAX;
+    TrainingExample *TEObj;
+    int index = 0;
+    int numExamples = 0;
+    
+    *rlistExamples = 0;
+    
+    line[0] = 0;
+    
+    if((fp = fopen (filename, "r")) == NULL)
+    {
+        cout<<"Error in opening file."<<endl;
+        return false;
+    }
+    
+    //Initialize weights to random values
+    srand (time(NULL));
+    
+    char *tmp;
+    int tmpParams = 0; //NO_OF_ATT;
+    double cd = 0.0;
+    
+    /* Read the data file line by line */
+    while((len = GetLine (line, lineSize, fp))!=0)
+    {
+        TEObj = new TrainingExample ();
+        tmp = strtok (line,",");
+        while (tmp != NULL)
+        {
+            cd = atof (tmp);
+            TEObj->Value[tmpParams] = cd;
+            tmpParams ++;
+            
+            tmp = strtok (NULL, ",");
+            
+            if(tmpParams == NO_OF_ATT)
+            {
+                tmpParams = 0;
+                cd = 0.0;
+                line[0] = 0;
+                numExamples ++;
+                
+                //Not using this normalization anymore.
+                // N(y) = y/(1+y)
+                // Doing normalization by standard deviation and mean
+                //TEObj->NormalizeVals ();
+                
+                /* Generating random weights for instances. */
+                /* These weights are used in instance WKNN  */
+                double rno = (double)(rand () % 100 + 1);
+                TEObj->Weight = rno/100;
+                TEObj->index = index++;
+                TEObj->isNearest2AtleastSome = false;
+                break;
+            }
+        }
+        
+        rlist->insert (rlist->end(), *TEObj);
+        
+        delete TEObj;
+    }
+    
+    /* Normalize values using standard deviation */
+    NormalizeByStandardDeviation (rlist, numExamples);
+    
+    *rlistExamples = numExamples;
+    
+    return true;
 }
