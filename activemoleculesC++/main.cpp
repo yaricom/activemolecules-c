@@ -17,6 +17,8 @@
 #include <iostream>
 #include <sys/time.h>
 
+#include "WeightedKNN.h"
+
 using namespace std;
 
 
@@ -151,7 +153,8 @@ private:
 //        int indexes[] = {7, 2, 8, 9, 12, 6, 5, 16, 15, 14, 17, 10, 20, 11, 18, 0, 19, 1, 4, 3}; // 893954.08
         
 //        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19, 4}; // 901736.64
-        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19};//899899.12
+//        int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19, 4};//899899.12
+        int indexes[] = {0, 1, 3, 4, 5, 6, 8, 9, 11, 12, 12, 15, 16, 17, 18, 19, 20};
         
         
         for (int i = 0; i < fCount; i++) important[i] = true;//false;
@@ -895,7 +898,7 @@ public:
                     (h_value_x[loop_index] - h_value_y[loop_index] - tau);
                 }
             }
-            if (LOG_DEBUG) cerr << iter_index + 1 << "-th iteration with error " << err << endl;
+//            if (LOG_DEBUG) cerr << iter_index + 1 << "-th iteration with error " << err << endl;
             
             iter_index += 1;
         }
@@ -943,14 +946,162 @@ void imputation(VC<Entry> &entries) {
             entries[i].completeFeatures = true;
             samplesCorrected++;
             
-            if (LOG_DEBUG) {
-                cerr << "Feature: " << entries[i].id << " = ";
-                print<double>(entries[i].features);
-            }
+//            if (LOG_DEBUG) {
+//                cerr << "Feature: " << entries[i].id << " = ";
+//                print<double>(entries[i].features);
+//            }
         }
     }
     if (LOG_DEBUG) cerr << "Samples corrected: " << samplesCorrected << endl;
 }
+
+pair<int, int> correctZeroDVBySimilarity(const VC<VD> &matrix, VC<Entry> &training) {
+    int X = training.size();
+    int count = 0;
+    int missedFeaturesSamples = 0;
+    for (int i = 0; i < X; i++) {
+        if (training[i].dv == Entry::NVL || training[i].dv == 0) {
+            // set entry DV using its similarity
+            double dvSum = 0;
+            double wSum = 0;
+            
+            // go through the row of similar entries
+            for (int j = 0; j < X; j++) {
+                double sim = matrix[training[i].id][training[j].id];
+                if (training[j].dv != Entry::NVL && training[i].id != training[j].id) {
+                    dvSum += sim * training[j].dv;
+                    wSum += sim;
+                }
+            }
+            training[i].dv = dvSum / wSum;
+//                if (LOG_DEBUG) cerr << "Id: " << training[i].id << ", DV: " << training[i].dv << ", dvSum: " << dvSum << ", wSum:" << wSum << endl;
+            
+            count++;
+        }
+        
+        if (!training[i].completeFeatures) {
+            missedFeaturesSamples++;
+        }
+        
+    }
+    return pair<int, int>(count, missedFeaturesSamples);
+}
+
+// X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
+// X_scaled = X_std * (max - min) + min
+void scaleMinMax(VC<Entry> &entries, double min, double max) {
+    int size = entries.size();
+    // fin min/max per sample per feature
+    VD fMins(size, 10000), fMaxs(size, -10000);
+    for (int i = 0 ; i < size; i++) {
+        for (int j = 0; j < entries[i].features.size(); j++) {
+            if (fMaxs[j] < entries[i].features[j]) {
+                fMaxs[j] = entries[i].features[j];
+            }
+            if (fMins[j] > entries[i].features[j]) {
+                fMins[j] = entries[i].features[j];
+            }
+        }
+    }
+    
+    // find X scaled
+    for (int i = 0 ; i < size; i++) {
+        for (int j = 0; j < entries[i].features.size(); j++) {
+            double X = entries[i].features[j];
+            double X_min = fMins[j];
+            double X_max = fMaxs[j];
+            double X_std = (X - X_min) / (X_max - X_min);
+            double X_scaled = X_std * (max - min) + min;
+            entries[i].features[j] = X_scaled;
+        }
+        cerr << "Entry id: " << entries[i].id << " "; print(entries[i].features);
+    }
+}
+
+void scaleDVMinMax(VC<Entry> &entries, double min, double max) {
+    int size = entries.size();
+    double Y_min = 10000;
+    double Y_max = -10000;
+    // fin min/max per sample
+    for (int i = 0 ; i < size; i++) {
+        double val = entries[i].dv != Entry::NVL ? entries[i].dv : 0;
+        if (Y_max < val) {
+            Y_max = val;
+        }
+        if (Y_min > val) {
+            Y_min = val;
+        }
+    }
+    cerr << "Y_min: " << Y_min << ", Y_max:  " << Y_max << endl;
+    
+    // find Y scaled
+    for (int i = 0 ; i < size; i++) {
+        double Y = entries[i].dv != Entry::NVL ? entries[i].dv : 0;
+        double Y_std = (Y - Y_min) / (Y_max - Y_min);
+        double Y_scaled = Y_std * (max - min) + min;
+        entries[i].dv = Y_scaled;
+
+        cerr << "Entry id: " << entries[i].id << ", dv:  " << entries[i].dv << endl;
+    }
+}
+
+VD createClassificationLabels(VC<Entry> entries) {
+    VD labels;
+    int X = entries.size();
+    int lIndex = 0;
+    for (int i = 0; i < X; i++) {
+        if (entries[i].dv != Entry::NVL) {
+            bool labelSet = false;
+            for (int j = 0; j < labels.size(); j++) {
+                // check if value already has label
+                if (labels[j] == entries[i].dv) {
+                    entries[i].dv = j;
+                    labelSet = true;
+                    break;
+                }
+            }
+            if (!labelSet) {
+                // assign new label to the DV and store last value
+                labels.PB(entries[i].dv);
+                entries[i].dv = lIndex;
+                lIndex++;
+            }
+        }
+    }
+    return labels;
+}
+
+/*void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool test) {
+    int X = entries.size();
+    for (int i = 0; i < X; i++) {
+        if (test || entries[i].dv != Entry::NVL) {
+            TrainingExample *example = new TrainingExample();
+            // copy features
+            for (int j = 0; j < entries[i].features.size(); j++) {
+                double val = entries[i].features[j];
+                example->Value[j] = val;
+            }
+            // copy DV
+            example->Value[NO_OF_ATT - 1] = entries[i].dv;
+            
+            // Generating random weights for instances.
+            // These weights are used in instance WKNN
+            double rno = (double)(rand () % 100 + 1);
+            example->Weight = rno/100;
+            example->index = entries[i].id;
+            example->isNearest2AtleastSome = false;
+            
+//            cerr << "Entry id: " << entries[i].id << ", features: ";print(entries[i].features);
+            
+            printExample(*example);
+            
+            // add to the list
+            rlist->insert (rlist->end(), *example);
+            
+            delete example;
+        }
+    }
+}*/
 
 class ActiveMolecules {
     int X;
@@ -1003,35 +1154,55 @@ class ActiveMolecules {
         
         assert(training.size() == X && testing.size() == Y);
         
-//        // correct training data
-//        int count = 0;
-//        int missedFeaturesSamples = 0;
-//        for (int i = 0; i < X; i++) {
-//            if (training[i].dv == Entry::NVL || training[i].dv == 0) {
-//                // set entry DV using its similarity
-//                double dvSum = 0;
-//                double wSum = 0;
-//                
-//                // go through the row of similar entries
-//                for (int j = 0; j < X; j++) {
-//                    double sim = matrix[training[i].id][training[j].id];
-//                    if (training[j].dv != Entry::NVL && training[i].id != training[j].id) {
-//                        dvSum += sim * training[j].dv;
-//                        wSum += sim;
-//                    }
-//                }
-//                training[i].dv = dvSum / wSum;
-////                if (LOG_DEBUG) cerr << "Id: " << training[i].id << ", DV: " << training[i].dv << ", dvSum: " << dvSum << ", wSum:" << wSum << endl;
-//                
-//                count++;
-//            }
-//            
-//            if (!training[i].completeFeatures) {
-//                missedFeaturesSamples++;
-//            }
-//            
-//        }
-//        cerr << "Corrected: " << count << ", found samples with missed features: " << missedFeaturesSamples << endl;
+        //
+        // normalize features
+        //
+        scaleMinMax(training, 0, 1);
+        scaleMinMax(testing, 0, 1);
+        
+        //
+        // Normalize DVs in training
+        //
+        scaleDVMinMax(training, 0, 1);
+        
+        //
+        // correct missed DV in training data
+        //
+        pair<int, int> correctedPair = correctZeroDVBySimilarity(matrix, training);
+        cerr << "Corrected: " << correctedPair.first << ", found samples with missed features: " << correctedPair.second << endl;
+        
+        
+        
+        // make classification labels
+        /*VD labels = createClassificationLabels(training);
+        if (LOG_DEBUG) {
+            cerr << "Labels ++++++++++++++++" << endl;
+            print<double>(labels);
+            cerr << "Labels size: " << labels.size() << endl;
+        }*/
+        
+        /*
+        // prepare WNN data
+        // Training Examples
+        TRAINING_EXAMPLES_LIST elist;
+        // Testing Examples
+        TRAINING_EXAMPLES_LIST qlist;
+        readExamples(training, &elist, false);
+        readExamples(testing, &qlist, true);
+        
+        
+        // run WNN algorithms
+        int wnnTrainingSize = elist.size();
+        cerr << "wnnTrainingSize: " << wnnTrainingSize << endl;
+        // Simple KNN
+        SimpleKNN (&elist, wnnTrainingSize, &qlist, Y);
+        // Attribute Weighted KNN with gradient descent and cross validation
+        AttributeWKNN (&elist, wnnTrainingSize, &qlist, Y);
+        // KNN with Backward Elimination
+        BackwardElimination (&elist, wnnTrainingSize, &qlist, Y);
+        // Instance Weighted KNN with gradient descent and cross validation
+        InstanceWKNN (&elist, wnnTrainingSize, &qlist, Y);
+        */
         
         // prepare data
         VC<VD> input_x;
@@ -1091,19 +1262,19 @@ class ActiveMolecules {
         
         double finishTime = getTime();
         
-        VC<Entry>simRes;
-        correctBySimilarity(training, meanResults, 0.0, simRes);
+//        VC<Entry>simRes;
+//        correctBySimilarity(training, meanResults, 0.0, simRes);
         
         if (LOG_DEBUG) cerr << "++++ OUT ++++" << endl;
         
         // sort to have highest rating at the top
-        sort(simRes.rbegin(), simRes.rend());
+        sort(meanResults.rbegin(), meanResults.rend());
         
         VI ids;
         for (int i = 0; i < Y; i++) {
-            if (LOG_DEBUG) cerr << "ID: " << simRes[i].id << ", activity: " << simRes[i].dv << endl;
+            if (LOG_DEBUG) cerr << "ID: " << meanResults[i].id << ", activity: " << meanResults[i].dv << endl;
             
-            ids.PB(simRes[i].id);
+            ids.PB(meanResults[i].id);
         }
         
         cerr << "pass_num: " << pass_num << ", learning_rate: " << conf.learning_rate << ", tree_min_nodes: " << conf.tree_min_nodes
@@ -1182,7 +1353,7 @@ private:
         int index = 0;
         for (Entry e : test) {
             int testId = e.id;
-            double testDv = e.dv * vals[index];
+            double testDv = e.dv;// * vals[index];
             
 //            double diff = testDv - vals[index];
 //            if (abs(diff) <= mae) {
