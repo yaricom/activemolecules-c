@@ -872,7 +872,7 @@ public:
             
             // fit a regression tree
             RegressionTree tree;
-            //tree.set_type(TerminalType.MAXIMAL);
+//            tree.m_type = MAXIMAL;
             
             tree.buildRegressionTree(gradient_x, gradient_y);
             
@@ -1091,16 +1091,19 @@ class ActiveMolecules {
         
         double finishTime = getTime();
         
+        VC<Entry>simRes;
+        correctBySimilarity(training, meanResults, 0.0, simRes);
+        
         if (LOG_DEBUG) cerr << "++++ OUT ++++" << endl;
         
         // sort to have highest rating at the top
-        sort(meanResults.rbegin(), meanResults.rend());
+        sort(simRes.rbegin(), simRes.rend());
         
         VI ids;
         for (int i = 0; i < Y; i++) {
-            if (LOG_DEBUG) cerr << "ID: " << meanResults[i].id << ", activity: " << meanResults[i].dv << endl;
+            if (LOG_DEBUG) cerr << "ID: " << simRes[i].id << ", activity: " << simRes[i].dv << endl;
             
-            ids.PB(meanResults[i].id);
+            ids.PB(simRes[i].id);
         }
         
         cerr << "pass_num: " << pass_num << ", learning_rate: " << conf.learning_rate << ", tree_min_nodes: " << conf.tree_min_nodes
@@ -1135,6 +1138,68 @@ private:
             Entry resEntry(testing[i].id);
             resEntry.dv = predictor->predict(testing[i].features);
             rank.PB(resEntry);
+        }
+    }
+    
+    void correctBySimilarity(const VC<Entry> &training, const VC<Entry> &test, double simSplit, VC<Entry> &simResults) {
+        // calculate MSE
+        double mae = 0;
+        VD vals;
+        for (Entry e : test) {
+            int testId = e.id;
+            double testDv = e.dv;
+            double dvSum = 0;
+            double wSum = 0;
+            
+            double maxSim = -1;
+            double maxVal = -1000;
+            for (Entry trEntry : training) {
+                double sim = matrix[testId][trEntry.id];
+                if (trEntry.dv != Entry::NVL) {
+                    dvSum += sim * trEntry.dv;
+                    wSum += sim;
+                    
+                    if (sim > maxSim) {
+                        maxSim = sim;
+                        maxVal = trEntry.dv;
+                    }
+                }
+            }
+            
+            double corr = dvSum / wSum;
+            //            vals.PB(corr);
+            //            mae += abs(testDv - corr);
+            
+            vals.PB(corr);
+            mae += abs(testDv - maxVal);
+            
+            //            if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", dvSum: " << dvSum << ", correction: " << corr << ", weights: " <<  wSum << endl;
+            if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", maxSim: " << maxSim << ", maxVal: " << maxVal << endl;
+        }
+        mae /= test.size();
+        if (LOG_DEBUG) cerr << "MAE: " << mae << endl;
+        
+        int index = 0;
+        for (Entry e : test) {
+            int testId = e.id;
+            double testDv = e.dv * vals[index];
+            
+//            double diff = testDv - vals[index];
+//            if (abs(diff) <= mae) {
+//                if (diff < 0) {
+//                    testDv =  vals[index] - mae / 2;
+//                } else if (diff > 0){
+//                    testDv =  vals[index] + mae / 2;
+//                }
+//                
+//            }
+            
+            if (LOG_DEBUG) cerr << "Entry: " << testId << " corrected with value: " << testDv << endl;
+            
+            Entry resEntry(testId);
+            resEntry.dv = testDv;
+            simResults.PB(resEntry);
+            index++;
         }
     }
 };
