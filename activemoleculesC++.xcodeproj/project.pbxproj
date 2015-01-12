@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		780488951A641A4700FF99B6 /* WeightedKNN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 780488941A641A4700FF99B6 /* WeightedKNN.cpp */; };
 		7850FA141A5C6A2D0045D4EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7850FA131A5C6A2D0045D4EF /* main.cpp */; };
 /* End PBXBuildFile section */
 
@@ -23,6 +24,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		780488941A641A4700FF99B6 /* WeightedKNN.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WeightedKNN.cpp; sourceTree = "<group>"; };
+		780488961A641A9A00FF99B6 /* WeightedKNN.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WeightedKNN.h; sourceTree = "<group>"; };
 		7850FA101A5C6A2D0045D4EF /* activemoleculesC++ */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "activemoleculesC++"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7850FA131A5C6A2D0045D4EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		7850FA1A1A5C6A8C0045D4EF /* stdc++.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "stdc++.h"; sourceTree = "<group>"; };
@@ -61,6 +64,8 @@
 			children = (
 				78C2111B1A5FD96300756600 /* Utils.h */,
 				7850FA131A5C6A2D0045D4EF /* main.cpp */,
+				780488941A641A4700FF99B6 /* WeightedKNN.cpp */,
+				780488961A641A9A00FF99B6 /* WeightedKNN.h */,
 				7850FA1A1A5C6A8C0045D4EF /* stdc++.h */,
 			);
 			path = "activemoleculesC++";
@@ -122,6 +127,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				780488951A641A4700FF99B6 /* WeightedKNN.cpp in Sources */,
 				7850FA141A5C6A2D0045D4EF /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
