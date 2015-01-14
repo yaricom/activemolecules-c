@@ -161,6 +161,7 @@ struct Entry {
     
 private:
     void initImportanceVector() {
+#ifdef USE_FEATURES_PRUNNING
 //        int indexes[] = {2, 7, 16, 18, 12, 11, 20, 1, 5}; // 902627.26
 //        int indexes[] = {3, 2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15, 17}; // 910678.93
 //        int indexes[] = {2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15}; // 910676.63
@@ -169,9 +170,6 @@ private:
         
         int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19, 4}; // 901736.64
         
-        
-        
-#ifdef USE_REGERESSION
         for (int i = 0; i < fCount; i++) important[i] = false;
         int sizeIn = (sizeof(indexes)/sizeof(*indexes));
         for (int i = 0; i < sizeIn; i++) {
@@ -1141,30 +1139,32 @@ void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool 
 
 #ifdef USE_XGBOOST
 void readParamMatrix(const VC<Entry> &entries, xgboost::learner::DMatrix *dMatrix) {
-    xgboost::io::DMatrixSimple *matrix = new xgboost::io::DMatrixSimple();
+    xgboost::io::DMatrixSimple matrix;
     int entriesSize = entries.size();
+    cerr << entriesSize << endl;
     std::vector<xgboost::RowBatch::Entry> feats;
     for (int i = 0; i < entriesSize; i++) {
         // iterate over features and collect in entry
         for (int j = 0; j < entries[i].features.size(); j++) {
-            double val = entries[i].features[j];
+            float val = entries[i].features[j];
             if (val != Entry::NVL) {
                 feats.push_back(xgboost::RowBatch::Entry(j ,val));
             }
         }
+        
         // collect DV
-        matrix->info.labels.PB(entries[i].dv);
-        
+        matrix.info.labels.PB((float)entries[i].dv);
         // add row batch
-        matrix->AddRow(feats);
+        matrix.AddRow(feats);
         
-        cerr << matrix->fmat_->NumCol() << endl;
+        // clear for next loop
+        feats.clear();
     }
     
-    int rowsSize = matrix->row_data_.size();
+    long rowsSize = matrix.info.info.num_row;
     xgboost::utils::Assert(rowsSize == entriesSize, "Wrong batch entry rows collected. Expected: %d, found %d", rowsSize, entriesSize);
     
-    dMatrix = matrix;
+    dMatrix = &matrix;
 }
 #endif
 
@@ -1249,12 +1249,59 @@ private:
         // subsample ratio of the training instance. Setting it to 0.5 means that XGBoost randomly collected half of the data instances to grow trees and this will prevent overfitting.
         learner.SetParam("subsample", "0.5");
         
+        learner.SetParam("silent", "1");
+
+        cerr << "Params set " << trainMat->info.info.num_col << endl;
+        
+        // set cache data
+        std::vector<xgboost::io::DataMatrix*> mats;
+        mats.push_back(trainMat);
+        learner.SetCacheData(mats);
+        
         // initialize model
         learner.InitModel();
         
-        // train learner
-        std::pair<std::string, float> metric = learner.Evaluate(*trainMat, "auto");
-        cerr << "Metric: " << metric.first << ", value: " << metric.second << endl;
+//        xgboost::utils::FeatMap featmap;
+//        std::vector<std::string> model_dump = learner.DumpModel(featmap, 1);
+//        for (size_t i = 0; i < model_dump.size(); ++i) {
+//            cerr << model_dump[i] << endl;
+//        }
+        
+        cerr << "Model initialized " << endl;
+        
+        /*! \brief the names of the evaluation data used in output log */
+        std::vector<std::string> eval_data_names;
+        std::vector<const xgboost::io::DataMatrix*> devalall;
+        devalall.push_back(trainMat);
+        eval_data_names.push_back(std::string("train"));
+        devalall.push_back(testMat);
+        eval_data_names.push_back(std::string("test"));
+        
+        //
+        // Train learner
+        //
+        
+        // number of boosting iterations
+        int num_round = 3;
+        
+        const time_t start = time(NULL);
+        unsigned long elapsed = 0;
+        learner.CheckInit(trainMat);
+        
+        cerr << "CheckInit " << endl;
+        
+        for (int i = 0; i < num_round; ++i) {
+            cerr << i << endl;
+            
+            elapsed = (unsigned long)(time(NULL) - start);
+            xgboost::utils::Printf("boosting round %d, %lu sec elapsed\n", i, elapsed);
+            
+            learner.UpdateOneIter(i, *trainMat);
+            std::string res = learner.EvalOneIter(i, devalall, eval_data_names);
+            
+            xgboost::utils::Printf("%s\n", res.c_str());
+            elapsed = (unsigned long)(time(NULL) - start);
+        }
         
         
         VI ids;

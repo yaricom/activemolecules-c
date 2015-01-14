@@ -11,7 +11,6 @@
 		7850FA141A5C6A2D0045D4EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7850FA131A5C6A2D0045D4EF /* main.cpp */; };
 		78D138431A66C1BF00278E67 /* gbm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138201A66C1BF00278E67 /* gbm.cpp */; };
 		78D138441A66C1BF00278E67 /* io.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138241A66C1BF00278E67 /* io.cpp */; };
-		78D138451A66C1BF00278E67 /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 78D138301A66C1BF00278E67 /* README.md */; };
 		78D138461A66C1BF00278E67 /* updater.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138341A66C1BF00278E67 /* updater.cpp */; };
 		78D138471A66C1BF00278E67 /* xgboost_main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138421A66C1BF00278E67 /* xgboost_main.cpp */; };
 /* End PBXBuildFile section */
@@ -51,7 +50,6 @@
 		78D1382D1A66C1BF00278E67 /* learner-inl.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "learner-inl.hpp"; sourceTree = "<group>"; };
 		78D1382E1A66C1BF00278E67 /* objective-inl.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "objective-inl.hpp"; sourceTree = "<group>"; };
 		78D1382F1A66C1BF00278E67 /* objective.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = objective.h; sourceTree = "<group>"; };
-		78D138301A66C1BF00278E67 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		78D138321A66C1BF00278E67 /* model.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = model.h; sourceTree = "<group>"; };
 		78D138331A66C1BF00278E67 /* param.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = param.h; sourceTree = "<group>"; };
 		78D138341A66C1BF00278E67 /* updater.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = updater.cpp; sourceTree = "<group>"; };
@@ -117,7 +115,6 @@
 				78D1381E1A66C1BF00278E67 /* gbm */,
 				78D138231A66C1BF00278E67 /* io */,
 				78D138281A66C1BF00278E67 /* learner */,
-				78D138301A66C1BF00278E67 /* README.md */,
 				78D138311A66C1BF00278E67 /* tree */,
 				78D138391A66C1BF00278E67 /* utils */,
 				78D138421A66C1BF00278E67 /* xgboost_main.cpp */,
@@ -249,7 +246,6 @@
 				78D138431A66C1BF00278E67 /* gbm.cpp in Sources */,
 				780488951A641A4700FF99B6 /* WeightedKNN.cpp in Sources */,
 				78D138471A66C1BF00278E67 /* xgboost_main.cpp in Sources */,
-				78D138451A66C1BF00278E67 /* README.md in Sources */,
 				7850FA141A5C6A2D0045D4EF /* main.cpp in Sources */,
 				78D138441A66C1BF00278E67 /* io.cpp in Sources */,
 				78D138461A66C1BF00278E67 /* updater.cpp in Sources */,
