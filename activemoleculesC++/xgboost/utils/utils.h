@@ -75,7 +75,7 @@ inline void HandleCheckError(const char *msg) {
   exit(-1);
 }
 inline void HandlePrint(const char *msg) {
-  printf("%s", msg);
+  fprintf(stderr, "%s", msg);
 }
 #else
 #ifndef XGBOOST_STRICT_CXX98_

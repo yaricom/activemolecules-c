@@ -5,6 +5,8 @@
  * \brief header to handle OpenMP compatibility issues
  * \author Tianqi Chen
  */
+#define DISABLE_OPENMP
+
 #if defined(_OPENMP)
 #include <omp.h>
 #else

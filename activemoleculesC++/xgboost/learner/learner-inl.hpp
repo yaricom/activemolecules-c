@@ -67,8 +67,7 @@ class BoostLearner {
       utils::SPrintf(str_temp, sizeof(str_temp), "%u", num_feature);
       this->SetParam("bst:num_feature", str_temp);
     }
-    utils::SPrintf(str_temp, sizeof(str_temp), "%lu",
-			 static_cast<unsigned long>(buffer_size));
+    utils::SPrintf(str_temp, sizeof(str_temp), "%lu", static_cast<unsigned long>(buffer_size));
     this->SetParam("num_pbuffer", str_temp);
     if (!silent) {
       utils::Printf("buffer_size=%ld\n", static_cast<long>(buffer_size));
@@ -161,6 +160,7 @@ class BoostLearner {
    * \param p_train pointer to the matrix used by training
    */
   inline void CheckInit(DMatrix *p_train) {
+      utils::Printf("CheckInit %lu", p_train);
     p_train->fmat()->InitColAccess(prob_buffer_row);
   }
   /*!
