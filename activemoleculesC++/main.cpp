@@ -23,6 +23,17 @@
 #include "WeightedKNN.h"
 #endif
 
+#define USE_XGBOOST
+
+#ifdef USE_XGBOOST
+#include "xgboost/io/io.h"
+#include "xgboost/io/simple_dmatrix-inl.hpp"
+#include "xgboost/utils/utils.h"
+#include "xgboost/utils/config.h"
+#include "xgboost/learner/learner-inl.hpp"
+#include "xgboost/data.h"
+#endif
+
 using namespace std;
 
 
@@ -476,8 +487,7 @@ private:
                 mean_right = sum_right / count_right;
                 
                 
-                current_err = -1 * count_left * mean_left * mean_left -
-                count_right * mean_right * mean_right;
+                current_err = -1 * count_left * mean_left * mean_left - count_right * mean_right * mean_right;
                 // current node value
                 current_node_value = (list_feature[loop_j + 1].m_x + fetched_data.m_x) / 2;
                 
@@ -516,8 +526,7 @@ private:
         for (int loop_i = 0; loop_i < count; loop_i++) {
             VD ith_feature = feature_x[loop_i];
             if (ith_feature[feature_index] < node_value) {
-                // append to the left
-                // feature
+                // append to the left feature
                 split_res.m_feature_left.PB(ith_feature);
                 // observation
                 split_res.m_obs_left.PB(obs_y[loop_i]);
@@ -1130,6 +1139,35 @@ void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool 
 }
 #endif
 
+#ifdef USE_XGBOOST
+void readParamMatrix(const VC<Entry> &entries, xgboost::learner::DMatrix *dMatrix) {
+    xgboost::io::DMatrixSimple *matrix = new xgboost::io::DMatrixSimple();
+    int entriesSize = entries.size();
+    std::vector<xgboost::RowBatch::Entry> feats;
+    for (int i = 0; i < entriesSize; i++) {
+        // iterate over features and collect in entry
+        for (int j = 0; j < entries[i].features.size(); j++) {
+            double val = entries[i].features[j];
+            if (val != Entry::NVL) {
+                feats.push_back(xgboost::RowBatch::Entry(j ,val));
+            }
+        }
+        // collect DV
+        matrix->info.labels.PB(entries[i].dv);
+        
+        // add row batch
+        matrix->AddRow(feats);
+        
+        cerr << matrix->fmat_->NumCol() << endl;
+    }
+    
+    int rowsSize = matrix->row_data_.size();
+    xgboost::utils::Assert(rowsSize == entriesSize, "Wrong batch entry rows collected. Expected: %d, found %d", rowsSize, entriesSize);
+    
+    dMatrix = matrix;
+}
+#endif
+
 class ActiveMolecules {
     int X;
     int Y;
@@ -1169,16 +1207,69 @@ class ActiveMolecules {
         assert(training.size() == X && testing.size() == Y);
         
 #ifdef USE_REGERESSION
-        // rank by regression
+#ifdef USE_XGBOOST
+        // rank by XGBT regression
+        VI res = renkByXGBRegression(training, testing);
+#else
+        // rank by GBT regression
         VI res = rankByGBTRegression(training, testing);
+#endif
 #else
         // rank by classification
         VI res = rankByClassification(training, testing);
+
 #endif
         return res;
     }
     
 private:
+#ifdef USE_XGBOOST
+    VI renkByXGBRegression(VC<Entry> &training, VC<Entry> &testing) {
+        cerr << "=========== Rank by XGBoost regression ===========" << endl;
+        // read data
+        xgboost::learner::DMatrix *trainMat;
+        readParamMatrix(training, trainMat);
+        
+        xgboost::learner::DMatrix *testMat;
+        readParamMatrix(testing, testMat);
+        
+        //
+        // initialize learner
+        //
+        xgboost::learner::BoostLearner learner;
+        // step size shrinkage used in update to prevents overfitting.  After each boosting step, we can directly get the weights of new features.
+        // And eta actually shrinkage the feature weights to make the boosting process more conservative. Learning rate.
+        learner.SetParam("eta", "0.3");
+        // minimum loss reduction required to make a further partition
+        learner.SetParam("gamma", "1.0");
+        // maximum depth of a tree
+        learner.SetParam("max_depth", "3");
+        // minimum sum of instance weight(hessian) needed in a child
+        learner.SetParam("min_child_weight", "1");
+        // subsample ratio of the training instance. Setting it to 0.5 means that XGBoost randomly collected half of the data instances to grow trees and this will prevent overfitting.
+        learner.SetParam("subsample", "0.5");
+        
+        // initialize model
+        learner.InitModel();
+        
+        // train learner
+        std::pair<std::string, float> metric = learner.Evaluate(*trainMat, "auto");
+        cerr << "Metric: " << metric.first << ", value: " << metric.second << endl;
+        
+        
+        VI ids;
+//        for (int i = 0; i < Y; i++) {
+//            if (LOG_DEBUG) cerr << "ID: " << testing[i].id << ", activity: " << testing[i].dv << endl;
+//            
+//            ids.PB(testing[i].id);
+//        }
+//        
+//        cerr << "Rank time: " << rankTime - startTime << ", full time: " << finishTime - startTime << endl;
+        
+        return ids;
+    }
+#endif
+    
 #ifndef USE_REGERESSION
     VI rankByClassification(VC<Entry> &training, VC<Entry> &testing) {
         
