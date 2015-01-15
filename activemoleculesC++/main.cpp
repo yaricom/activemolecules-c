@@ -142,7 +142,7 @@ struct Entry {
                 index++;
             }
         }
-
+        
         // set DV if present
         if (vs.size() == fCount + 1) {
             dv = parse(vs[fCount]);
@@ -162,11 +162,11 @@ struct Entry {
 private:
     void initImportanceVector() {
 #ifdef USE_FEATURES_PRUNNING
-//        int indexes[] = {2, 7, 16, 18, 12, 11, 20, 1, 5}; // 902627.26
-//        int indexes[] = {3, 2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15, 17}; // 910678.93
-//        int indexes[] = {2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15}; // 910676.63
-//        int indexes[] = {2, 9, 7, 5, 16, 8, 11, 18, 12, 1, 14, 20, 6, 10, 15, 17, 19}; // 902973.90
-//        int indexes[] = {7, 2, 8, 9, 12, 6, 5, 16, 15, 14, 17, 10, 20, 11, 18, 0, 19, 1, 4, 3}; // 893954.08
+        //        int indexes[] = {2, 7, 16, 18, 12, 11, 20, 1, 5}; // 902627.26
+        //        int indexes[] = {3, 2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15, 17}; // 910678.93
+        //        int indexes[] = {2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15}; // 910676.63
+        //        int indexes[] = {2, 9, 7, 5, 16, 8, 11, 18, 12, 1, 14, 20, 6, 10, 15, 17, 19}; // 902973.90
+        //        int indexes[] = {7, 2, 8, 9, 12, 6, 5, 16, 15, 14, 17, 10, 20, 11, 18, 0, 19, 1, 4, 3}; // 893954.08
         
         int indexes[] = {2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 1, 15, 11, 17, 0, 10, 19, 4}; // 901736.64
         
@@ -228,7 +228,7 @@ public:
         
         // suffle
         random_unique(re_res.begin(), re_res.end(), m_number);
-
+        
         // resize vector
         re_res.resize(m_number);
         VI(re_res).swap(re_res);
@@ -681,9 +681,9 @@ class GradientBoostingTree {
     int m_tree_depth;
     
 public:
-
+    
     GradientBoostingTree(double sample_size_ratio, double learning_rate,
-                                int tree_number, int tree_min_nodes, int tree_depth) {
+                         int tree_number, int tree_min_nodes, int tree_depth) {
         // This will be called when initialize the class with parameters
         
         /*
@@ -882,12 +882,12 @@ public:
                     gradient_y.PB(0.0);
                     gradient_y.PB(0.0);
                 }
-//                cerr << "sel_index: " << sel_index << endl;
+                //                cerr << "sel_index: " << sel_index << endl;
             }
             
             // fit a regression tree
             RegressionTree tree;
-//            tree.m_type = MAXIMAL;
+            //            tree.m_type = MAXIMAL;
             
             tree.buildRegressionTree(gradient_x, gradient_y);
             
@@ -910,7 +910,7 @@ public:
                     (h_value_x[loop_index] - h_value_y[loop_index] - tau);
                 }
             }
-//            if (LOG_DEBUG) cerr << iter_index + 1 << "-th iteration with error " << err << endl;
+            //            if (LOG_DEBUG) cerr << iter_index + 1 << "-th iteration with error " << err << endl;
             
             iter_index += 1;
         }
@@ -957,10 +957,10 @@ void imputation(VC<Entry> &entries) {
             entries[i].completeFeatures = true;
             samplesCorrected++;
             
-//            if (LOG_DEBUG) {
-//                cerr << "Feature: " << entries[i].id << " = ";
-//                print<double>(entries[i].features);
-//            }
+            //            if (LOG_DEBUG) {
+            //                cerr << "Feature: " << entries[i].id << " = ";
+            //                print<double>(entries[i].features);
+            //            }
         }
     }
     if (LOG_DEBUG) cerr << "Samples corrected: " << samplesCorrected << endl;
@@ -1005,7 +1005,7 @@ pair<int, int> correctZeroDVBySimilarity(const VC<VD> &matrix, VC<Entry> &traini
                 }
             }
             training[i].dv = dvSum / wSum;
-//            if (LOG_DEBUG) cerr << "Id: " << training[i].id << ", DV: " << training[i].dv << ", dvSum: " << dvSum << ", wSum:" << wSum << endl;
+            //            if (LOG_DEBUG) cerr << "Id: " << training[i].id << ", DV: " << training[i].dv << ", dvSum: " << dvSum << ", wSum:" << wSum << endl;
             
             count++;
         }
@@ -1072,7 +1072,7 @@ void scaleDVMinMax(VC<Entry> &entries, double min, double max) {
         double Y_std = (Y - Y_min) / (Y_max - Y_min);
         double Y_scaled = Y_std * (max - min) + min;
         entries[i].dv = Y_scaled;
-
+        
         cerr << "Entry id: " << entries[i].id << ", dv:  " << entries[i].dv << endl;
     }
 }
@@ -1124,7 +1124,7 @@ void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool 
             example->index = entries[i].id;
             example->isNearest2AtleastSome = false;
             
-//            cerr << "Entry id: " << entries[i].id << ", features: ";print(entries[i].features);
+            //            cerr << "Entry id: " << entries[i].id << ", features: ";print(entries[i].features);
             
             printExample(*example);
             
@@ -1171,7 +1171,7 @@ class ActiveMolecules {
     int M;
     VC<VD>matrix;
     
-    public:
+public:
     
     int similarity(int moleculeID, VD &similarities) {
         if (!matrix.size()) {
@@ -1214,7 +1214,7 @@ class ActiveMolecules {
 #else
         // rank by classification
         VI res = rankByClassification(training, testing);
-
+        
 #endif
         return res;
     }
@@ -1223,6 +1223,12 @@ private:
 #ifdef USE_XGBOOST
     VI renkByXGBRegression(VC<Entry> &training, VC<Entry> &testing) {
         cerr << "=========== Rank by XGBoost regression ===========" << endl;
+        
+        //
+        // correct missed DV in training data
+        //
+        pair<int, int> correctedPair = correctZeroDVBySimilarity(matrix, training);
+        cerr << "Corrected: " << correctedPair.first << ", found samples with missed features: " << correctedPair.second << endl;
         
         double startTime = getTime();
         
@@ -1241,21 +1247,29 @@ private:
         // And eta actually shrinkage the feature weights to make the boosting process more conservative. Learning rate.
         learner.SetParam("eta", "0.3");
         // minimum loss reduction required to make a further partition
-        learner.SetParam("gamma", "1.0");
+        learner.SetParam("gamma", "3.0");
         // maximum depth of a tree
-        learner.SetParam("max_depth", "6");
+        learner.SetParam("max_depth", "3");
         // minimum sum of instance weight(hessian) needed in a child
         learner.SetParam("min_child_weight", "1");
         // subsample ratio of the training instance. Setting it to 0.5 means that XGBoost randomly collected half of the data instances to grow trees and this will prevent overfitting.
-        learner.SetParam("subsample", "0.5");
+        learner.SetParam("subsample", "1");
         // evaluation metrics for validation data (rmse, logloss)
         learner.SetParam("eval_metric", "rmse");
         // the objective function (reg:linear, reg:logistic)
         learner.SetParam("objective", "reg:linear");
         
         learner.SetParam("silent", "1");
+        
+        
+        cerr << "Model configuration: " << endl;
+        
+        // print configs
+        std::vector< std::pair<std::string, std::string> > cfg = learner.cfg_;
+        for (int i = 0; i < cfg.size(); i++) {
+            cerr << cfg[i].first << "=" << cfg[i].second << endl;
+        }
 
-        cerr << "Params set " << trainMat.info.info.num_col << endl;
         
         // set cache data
         std::vector<xgboost::io::DataMatrix*> mats;
@@ -1265,32 +1279,61 @@ private:
         // initialize model
         learner.InitModel();
         
-//        xgboost::utils::FeatMap featmap;
-//        std::vector<std::string> model_dump = learner.DumpModel(featmap, 1);
-//        for (size_t i = 0; i < model_dump.size(); ++i) {
-//            cerr << model_dump[i] << endl;
-//        }
-        
-        cerr << "Model initialized " << endl;
+        //        xgboost::utils::FeatMap featmap;
+        //        std::vector<std::string> model_dump = learner.DumpModel(featmap, 1);
+        //        for (size_t i = 0; i < model_dump.size(); ++i) {
+        //            cerr << model_dump[i] << endl;
+        //        }
         
         /*! \brief the names of the evaluation data used in output log */
         std::vector<std::string> eval_data_names;
         std::vector<const xgboost::io::DataMatrix*> devalall;
         devalall.push_back(&trainMat);
         eval_data_names.push_back(std::string("train"));
-//        devalall.push_back(&testMat);
-//        eval_data_names.push_back(std::string("test"));
+        //        devalall.push_back(&testMat);
+        //        eval_data_names.push_back(std::string("test"));
+        
+        
+        
+        
+//        std::vector<float> &vec =
+//        static_cast<DataMatrix*>(handle)->info.GetFloatInfo(field);
+//        vec.resize(len);
+//        memcpy(BeginPtr(vec), info, sizeof(float) * len);
+
+
+        
         
         //
         // Train learner
         //
         
         // number of boosting iterations
-        int num_round = 300;
+        int num_round = 100;
         
         const time_t start = time(NULL);
         unsigned long elapsed = 0;
+        
         learner.CheckInit(&trainMat);
+        
+        //
+        // Make base prediction
+        //
+        // train xgboost for 1 round
+//        for (int i = 0; i < num_round; ++i) {
+//            learner.UpdateOneIter(i, trainMat);
+//            std::string res = learner.EvalOneIter(i, devalall, eval_data_names);
+//        }
+//        VC<float> ptrain;
+//        learner.Predict(trainMat, true, &ptrain);
+//        VC<float> ptest;
+//        learner.Predict(testMat, true, &ptest);
+//        
+//        // set base margin
+//        trainMat.info.base_margin = ptrain;
+//        testMat.info.base_margin = ptest;
+//        
+//        cerr << "Base prediction finished" << endl;
         
         for (int i = 0; i < num_round; ++i) {
             
@@ -1307,9 +1350,9 @@ private:
         xgboost::utils::FeatMap fmap;
         std::vector<std::string> model = learner.DumpModel(fmap, 1);
         cerr << "Dumped model size: " << model.size() << endl;
-        for (int i = 0; i < model.size(); i++) {
-            xgboost::utils::Printf("%s\n ", model[i].c_str());
-        }
+//        for (int i = 0; i < model.size(); i++) {
+//            xgboost::utils::Printf("%s\n ", model[i].c_str());
+//        }
         
         double rankTime = getTime();
         
@@ -1317,7 +1360,7 @@ private:
         // Predict
         //
         VC<float>Y_test;
-        learner.Predict(testMat, true, &Y_test);
+        learner.Predict(testMat, false, &Y_test);
         
         // assign results
         for (int i = 0; i < Y; i++) {
@@ -1371,8 +1414,8 @@ private:
         cerr << "Real training size: " << knnTrainingSize << ", testing size: " << knnTestingSize << endl;
         
         // Normalize values using standard deviation
-//        NormalizeByStandardDeviation (&elist, knnTrainingSize);
-//        NormalizeByStandardDeviation(&qlist, knnTestingSize);
+        //        NormalizeByStandardDeviation (&elist, knnTrainingSize);
+        //        NormalizeByStandardDeviation(&qlist, knnTestingSize);
         
         // run WNN algorithms
         VI testClasses = classifyByKNNBackwardElimination(&elist, &qlist);
@@ -1413,13 +1456,13 @@ private:
         //
         // normalize features
         //
-//        scaleMinMax(training, 0, 1);
-//        scaleMinMax(testing, 0, 1);
+        //        scaleMinMax(training, 0, 1);
+        //        scaleMinMax(testing, 0, 1);
         
         //
         // Normalize DVs in training
         //
-//        scaleDVMinMax(training, 0, 1);
+        //        scaleDVMinMax(training, 0, 1);
         
         
         //
@@ -1509,21 +1552,21 @@ private:
     }
     
     void rank(const VC<VD> &input_x, const VD &input_y, const VC<Entry> &testing, const GBTConfig &conf, VC<Entry> &rank) {
-//        VC<VD> input_yy;
-//        int feature_dim = input_x[0].size();
-//        for (double y : input_y) {
-//            VD yList;
-//            for (int i = 0; i < feature_dim; i++) {
-//                yList.PB(y);
-//            }
-//            
-//            input_yy.PB(yList);
-//        }
+        //        VC<VD> input_yy;
+        //        int feature_dim = input_x[0].size();
+        //        for (double y : input_y) {
+        //            VD yList;
+        //            for (int i = 0; i < feature_dim; i++) {
+        //                yList.PB(y);
+        //            }
+        //
+        //            input_yy.PB(yList);
+        //        }
         
         // train
         GradientBoostingTree tree(conf.sampling_size_ratio, conf.learning_rate, conf.tree_number, conf.tree_min_nodes, conf.tree_depth);
         ResultFunction *predictor = tree.fitGradientBoostingTree(input_x, input_y);
-//        ResultFunction *predictor = tree.learnGradientBoostingRanker(input_x, input_yy, .21);
+        //        ResultFunction *predictor = tree.learnGradientBoostingRanker(input_x, input_yy, .21);
         
         // predict
         int test_N = testing.size();
@@ -1577,15 +1620,15 @@ private:
             int testId = e.id;
             double testDv = e.dv;// * vals[index];
             
-//            double diff = testDv - vals[index];
-//            if (abs(diff) <= mae) {
-//                if (diff < 0) {
-//                    testDv =  vals[index] - mae / 2;
-//                } else if (diff > 0){
-//                    testDv =  vals[index] + mae / 2;
-//                }
-//                
-//            }
+            //            double diff = testDv - vals[index];
+            //            if (abs(diff) <= mae) {
+            //                if (diff < 0) {
+            //                    testDv =  vals[index] - mae / 2;
+            //                } else if (diff > 0){
+            //                    testDv =  vals[index] + mae / 2;
+            //                }
+            //
+            //            }
             
             if (LOG_DEBUG) cerr << "Entry: " << testId << " corrected with value: " << testDv << endl;
             
