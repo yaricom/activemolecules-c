@@ -324,13 +324,16 @@ class BoostLearner {
   IObjFunction *obj_;
   // name of objective function
   std::string name_obj_;
-  // configurations
-  std::vector< std::pair<std::string, std::string> > cfg_;
+  
   // temporal storages for prediciton
   std::vector<float> preds_;
   // gradient pairs
   std::vector<bst_gpair> gpair_;
 
+public:
+    // configurations
+    std::vector< std::pair<std::string, std::string> > cfg_;
+    
  private:
   // cache entry object that helps handle feature caching
   struct CacheEntry {
