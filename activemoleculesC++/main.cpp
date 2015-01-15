@@ -1138,8 +1138,7 @@ void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool 
 #endif
 
 #ifdef USE_XGBOOST
-void readParamMatrix(const VC<Entry> &entries, xgboost::learner::DMatrix *dMatrix) {
-    xgboost::io::DMatrixSimple matrix;
+void readParamMatrix(const VC<Entry> &entries, xgboost::io::DMatrixSimple &dMatrix) {
     int entriesSize = entries.size();
     cerr << entriesSize << endl;
     std::vector<xgboost::RowBatch::Entry> feats;
@@ -1153,18 +1152,16 @@ void readParamMatrix(const VC<Entry> &entries, xgboost::learner::DMatrix *dMatri
         }
         
         // collect DV
-        matrix.info.labels.PB((float)entries[i].dv);
+        dMatrix.info.labels.PB((float)entries[i].dv);
         // add row batch
-        matrix.AddRow(feats);
+        dMatrix.AddRow(feats);
         
         // clear for next loop
         feats.clear();
     }
     
-    long rowsSize = matrix.info.info.num_row;
+    long rowsSize = dMatrix.info.info.num_row;
     xgboost::utils::Assert(rowsSize == entriesSize, "Wrong batch entry rows collected. Expected: %d, found %d", rowsSize, entriesSize);
-    
-    dMatrix = &matrix;
 }
 #endif
 
@@ -1226,11 +1223,14 @@ private:
 #ifdef USE_XGBOOST
     VI renkByXGBRegression(VC<Entry> &training, VC<Entry> &testing) {
         cerr << "=========== Rank by XGBoost regression ===========" << endl;
+        
+        double startTime = getTime();
+        
         // read data
-        xgboost::learner::DMatrix *trainMat;
+        xgboost::io::DMatrixSimple trainMat;
         readParamMatrix(training, trainMat);
         
-        xgboost::learner::DMatrix *testMat;
+        xgboost::io::DMatrixSimple testMat;
         readParamMatrix(testing, testMat);
         
         //
@@ -1243,19 +1243,23 @@ private:
         // minimum loss reduction required to make a further partition
         learner.SetParam("gamma", "1.0");
         // maximum depth of a tree
-        learner.SetParam("max_depth", "3");
+        learner.SetParam("max_depth", "6");
         // minimum sum of instance weight(hessian) needed in a child
         learner.SetParam("min_child_weight", "1");
         // subsample ratio of the training instance. Setting it to 0.5 means that XGBoost randomly collected half of the data instances to grow trees and this will prevent overfitting.
         learner.SetParam("subsample", "0.5");
+        // evaluation metrics for validation data (rmse, logloss)
+        learner.SetParam("eval_metric", "rmse");
+        // the objective function (reg:linear, reg:logistic)
+        learner.SetParam("objective", "reg:linear");
         
         learner.SetParam("silent", "1");
 
-        cerr << "Params set " << trainMat->info.info.num_col << endl;
+        cerr << "Params set " << trainMat.info.info.num_col << endl;
         
         // set cache data
         std::vector<xgboost::io::DataMatrix*> mats;
-        mats.push_back(trainMat);
+        mats.push_back(&trainMat);
         learner.SetCacheData(mats);
         
         // initialize model
@@ -1272,46 +1276,68 @@ private:
         /*! \brief the names of the evaluation data used in output log */
         std::vector<std::string> eval_data_names;
         std::vector<const xgboost::io::DataMatrix*> devalall;
-        devalall.push_back(trainMat);
+        devalall.push_back(&trainMat);
         eval_data_names.push_back(std::string("train"));
-        devalall.push_back(testMat);
-        eval_data_names.push_back(std::string("test"));
+//        devalall.push_back(&testMat);
+//        eval_data_names.push_back(std::string("test"));
         
         //
         // Train learner
         //
         
         // number of boosting iterations
-        int num_round = 3;
+        int num_round = 300;
         
         const time_t start = time(NULL);
         unsigned long elapsed = 0;
-        learner.CheckInit(trainMat);
-        
-        cerr << "CheckInit " << endl;
+        learner.CheckInit(&trainMat);
         
         for (int i = 0; i < num_round; ++i) {
-            cerr << i << endl;
             
             elapsed = (unsigned long)(time(NULL) - start);
             xgboost::utils::Printf("boosting round %d, %lu sec elapsed\n", i, elapsed);
             
-            learner.UpdateOneIter(i, *trainMat);
+            learner.UpdateOneIter(i, trainMat);
             std::string res = learner.EvalOneIter(i, devalall, eval_data_names);
             
-            xgboost::utils::Printf("%s\n", res.c_str());
+            xgboost::utils::Printf("%s\n ", res.c_str());
             elapsed = (unsigned long)(time(NULL) - start);
         }
         
+        xgboost::utils::FeatMap fmap;
+        std::vector<std::string> model = learner.DumpModel(fmap, 1);
+        cerr << "Dumped model size: " << model.size() << endl;
+        for (int i = 0; i < model.size(); i++) {
+            xgboost::utils::Printf("%s\n ", model[i].c_str());
+        }
+        
+        double rankTime = getTime();
+        
+        //
+        // Predict
+        //
+        VC<float>Y_test;
+        learner.Predict(testMat, true, &Y_test);
+        
+        // assign results
+        for (int i = 0; i < Y; i++) {
+            testing[i].dv = Y_test[i];
+        }
+        
+        // sort
+        sort(testing.rbegin(), testing.rend());
+        
         
         VI ids;
-//        for (int i = 0; i < Y; i++) {
-//            if (LOG_DEBUG) cerr << "ID: " << testing[i].id << ", activity: " << testing[i].dv << endl;
-//            
-//            ids.PB(testing[i].id);
-//        }
-//        
-//        cerr << "Rank time: " << rankTime - startTime << ", full time: " << finishTime - startTime << endl;
+        for (int i = 0; i < Y; i++) {
+            if (LOG_DEBUG) cerr << "ID: " << testing[i].id << ", activity: " << testing[i].dv << endl;
+            
+            ids.PB(testing[i].id);
+        }
+        
+        double finishTime = getTime();
+        
+        cerr << "Train time: " << rankTime - startTime << ", rank time: " <<  finishTime - rankTime  << ", full time: " << finishTime - startTime << endl;
         
         return ids;
     }

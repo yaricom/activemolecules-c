@@ -34,7 +34,6 @@ class DMatrixSimple : public DataMatrix {
     delete fmat_;
   }
   virtual IFMatrix *fmat(void) const {
-      utils::Printf("fmat %lu", fmat_);
     return fmat_;
   }
   /*! \brief clear the storage */
