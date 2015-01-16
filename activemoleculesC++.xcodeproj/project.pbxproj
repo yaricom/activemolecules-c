@@ -8,7 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		780488951A641A4700FF99B6 /* WeightedKNN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 780488941A641A4700FF99B6 /* WeightedKNN.cpp */; };
-		7850FA141A5C6A2D0045D4EF /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7850FA131A5C6A2D0045D4EF /* main.cpp */; };
+		7850FA141A5C6A2D0045D4EF /* ActiveMolecules.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7850FA131A5C6A2D0045D4EF /* ActiveMolecules.cpp */; };
+		78D03D561A69572800C39D90 /* TestRunner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D03D521A6955D100C39D90 /* TestRunner.cpp */; };
+		78D03D571A69572800C39D90 /* gbm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138201A66C1BF00278E67 /* gbm.cpp */; };
+		78D03D581A69572800C39D90 /* WeightedKNN.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 780488941A641A4700FF99B6 /* WeightedKNN.cpp */; };
+		78D03D591A69572800C39D90 /* xgboost_main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138421A66C1BF00278E67 /* xgboost_main.cpp */; };
+		78D03D5A1A69572800C39D90 /* ActiveMolecules.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7850FA131A5C6A2D0045D4EF /* ActiveMolecules.cpp */; };
+		78D03D5B1A69572800C39D90 /* io.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138241A66C1BF00278E67 /* io.cpp */; };
+		78D03D5C1A69572800C39D90 /* updater.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138341A66C1BF00278E67 /* updater.cpp */; };
 		78D138431A66C1BF00278E67 /* gbm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138201A66C1BF00278E67 /* gbm.cpp */; };
 		78D138441A66C1BF00278E67 /* io.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138241A66C1BF00278E67 /* io.cpp */; };
 		78D138461A66C1BF00278E67 /* updater.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D138341A66C1BF00278E67 /* updater.cpp */; };
@@ -25,15 +32,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
+		78D03D5E1A69572800C39D90 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		780488941A641A4700FF99B6 /* WeightedKNN.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WeightedKNN.cpp; sourceTree = "<group>"; };
 		780488961A641A9A00FF99B6 /* WeightedKNN.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WeightedKNN.h; sourceTree = "<group>"; };
 		7850FA101A5C6A2D0045D4EF /* activemoleculesC++ */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "activemoleculesC++"; sourceTree = BUILT_PRODUCTS_DIR; };
-		7850FA131A5C6A2D0045D4EF /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		7850FA131A5C6A2D0045D4EF /* ActiveMolecules.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ActiveMolecules.cpp; sourceTree = "<group>"; };
 		7850FA1A1A5C6A8C0045D4EF /* stdc++.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "stdc++.h"; sourceTree = "<group>"; };
 		78C2111B1A5FD96300756600 /* Utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Utils.h; sourceTree = "<group>"; };
+		78D03D521A6955D100C39D90 /* TestRunner.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TestRunner.cpp; sourceTree = "<group>"; };
+		78D03D621A69572800C39D90 /* activemoleculesC++ copy */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "activemoleculesC++ copy"; sourceTree = BUILT_PRODUCTS_DIR; };
+		78D03D631A696FC300C39D90 /* ActiveMolecules.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ActiveMolecules.h; sourceTree = "<group>"; };
 		78D1381D1A66C1BF00278E67 /* data.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = data.h; sourceTree = "<group>"; };
 		78D1381F1A66C1BF00278E67 /* gblinear-inl.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "gblinear-inl.hpp"; sourceTree = "<group>"; };
 		78D138201A66C1BF00278E67 /* gbm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = gbm.cpp; sourceTree = "<group>"; };
@@ -76,6 +95,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		78D03D5D1A69572800C39D90 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -91,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				7850FA101A5C6A2D0045D4EF /* activemoleculesC++ */,
+				78D03D621A69572800C39D90 /* activemoleculesC++ copy */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -100,7 +127,9 @@
 			children = (
 				78D1381C1A66C1BF00278E67 /* xgboost */,
 				78C2111B1A5FD96300756600 /* Utils.h */,
-				7850FA131A5C6A2D0045D4EF /* main.cpp */,
+				7850FA131A5C6A2D0045D4EF /* ActiveMolecules.cpp */,
+				78D03D631A696FC300C39D90 /* ActiveMolecules.h */,
+				78D03D521A6955D100C39D90 /* TestRunner.cpp */,
 				780488941A641A4700FF99B6 /* WeightedKNN.cpp */,
 				780488961A641A9A00FF99B6 /* WeightedKNN.h */,
 				7850FA1A1A5C6A8C0045D4EF /* stdc++.h */,
@@ -207,6 +236,23 @@
 			productReference = 7850FA101A5C6A2D0045D4EF /* activemoleculesC++ */;
 			productType = "com.apple.product-type.tool";
 		};
+		78D03D541A69572800C39D90 /* activemoleculesC runner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 78D03D5F1A69572800C39D90 /* Build configuration list for PBXNativeTarget "activemoleculesC runner" */;
+			buildPhases = (
+				78D03D551A69572800C39D90 /* Sources */,
+				78D03D5D1A69572800C39D90 /* Frameworks */,
+				78D03D5E1A69572800C39D90 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "activemoleculesC runner";
+			productName = "activemoleculesC++";
+			productReference = 78D03D621A69572800C39D90 /* activemoleculesC++ copy */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -234,6 +280,7 @@
 			projectRoot = "";
 			targets = (
 				7850FA0F1A5C6A2D0045D4EF /* activemoleculesC++ */,
+				78D03D541A69572800C39D90 /* activemoleculesC runner */,
 			);
 		};
 /* End PBXProject section */
@@ -246,9 +293,23 @@
 				78D138431A66C1BF00278E67 /* gbm.cpp in Sources */,
 				780488951A641A4700FF99B6 /* WeightedKNN.cpp in Sources */,
 				78D138471A66C1BF00278E67 /* xgboost_main.cpp in Sources */,
-				7850FA141A5C6A2D0045D4EF /* main.cpp in Sources */,
+				7850FA141A5C6A2D0045D4EF /* ActiveMolecules.cpp in Sources */,
 				78D138441A66C1BF00278E67 /* io.cpp in Sources */,
 				78D138461A66C1BF00278E67 /* updater.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		78D03D551A69572800C39D90 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				78D03D561A69572800C39D90 /* TestRunner.cpp in Sources */,
+				78D03D571A69572800C39D90 /* gbm.cpp in Sources */,
+				78D03D581A69572800C39D90 /* WeightedKNN.cpp in Sources */,
+				78D03D591A69572800C39D90 /* xgboost_main.cpp in Sources */,
+				78D03D5A1A69572800C39D90 /* ActiveMolecules.cpp in Sources */,
+				78D03D5B1A69572800C39D90 /* io.cpp in Sources */,
+				78D03D5C1A69572800C39D90 /* updater.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -353,6 +414,26 @@
 			};
 			name = Release;
 		};
+		78D03D601A69572800C39D90 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				INSTALL_PATH = "$(SRCROOT)/tester";
+				PRODUCT_NAME = "activemoleculesC++ copy";
+				SYMROOT = build;
+			};
+			name = Debug;
+		};
+		78D03D611A69572800C39D90 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				INSTALL_PATH = "$(SRCROOT)/tester";
+				PRODUCT_NAME = "activemoleculesC++ copy";
+				SYMROOT = build;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -370,6 +451,15 @@
 			buildConfigurations = (
 				7850FA181A5C6A2D0045D4EF /* Debug */,
 				7850FA191A5C6A2D0045D4EF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		78D03D5F1A69572800C39D90 /* Build configuration list for PBXNativeTarget "activemoleculesC runner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				78D03D601A69572800C39D90 /* Debug */,
+				78D03D611A69572800C39D90 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
