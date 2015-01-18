@@ -46,6 +46,8 @@
 /* Begin PBXFileReference section */
 		780488941A641A4700FF99B6 /* WeightedKNN.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WeightedKNN.cpp; sourceTree = "<group>"; };
 		780488961A641A9A00FF99B6 /* WeightedKNN.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WeightedKNN.h; sourceTree = "<group>"; };
+		783CB0E21A6C760200854221 /* marray.hxx */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = marray.hxx; sourceTree = "<group>"; };
+		783CB0E41A6C760200854221 /* decision-trees.hxx */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "decision-trees.hxx"; sourceTree = "<group>"; };
 		7850FA101A5C6A2D0045D4EF /* activemoleculesC++ */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "activemoleculesC++"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7850FA131A5C6A2D0045D4EF /* ActiveMolecules.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ActiveMolecules.cpp; sourceTree = "<group>"; };
 		7850FA1A1A5C6A8C0045D4EF /* stdc++.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "stdc++.h"; sourceTree = "<group>"; };
@@ -105,6 +107,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		783CB0E11A6C760200854221 /* andres */ = {
+			isa = PBXGroup;
+			children = (
+				783CB0E21A6C760200854221 /* marray.hxx */,
+				783CB0E31A6C760200854221 /* ml */,
+			);
+			path = andres;
+			sourceTree = "<group>";
+		};
+		783CB0E31A6C760200854221 /* ml */ = {
+			isa = PBXGroup;
+			children = (
+				783CB0E41A6C760200854221 /* decision-trees.hxx */,
+			);
+			path = ml;
+			sourceTree = "<group>";
+		};
 		7850FA071A5C6A2D0045D4EF = {
 			isa = PBXGroup;
 			children = (
@@ -125,6 +144,7 @@
 		7850FA121A5C6A2D0045D4EF /* activemoleculesC++ */ = {
 			isa = PBXGroup;
 			children = (
+				783CB0E11A6C760200854221 /* andres */,
 				78D1381C1A66C1BF00278E67 /* xgboost */,
 				78C2111B1A5FD96300756600 /* Utils.h */,
 				7850FA131A5C6A2D0045D4EF /* ActiveMolecules.cpp */,
