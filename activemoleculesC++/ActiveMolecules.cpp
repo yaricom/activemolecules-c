@@ -8,23 +8,14 @@
 
 #define LOCAL true
 
-#ifdef LOCAL
-#include "stdc++.h"
-#include "ActiveMolecules.h"
-#else
-#include <bits/stdc++.h>
-#endif
-
 #define USE_REGERESSION
+//#define USE_XGBOOST
 
-#include <iostream>
-#include <sys/time.h>
+//#define USE_FEATURES_PRUNNING
 
 #ifndef USE_REGERESSION
 #include "WeightedKNN.h"
 #endif
-
-#define USE_XGBOOST
 
 #ifdef USE_XGBOOST
 #include "xgboost/io/io.h"
@@ -34,6 +25,16 @@
 #include "xgboost/learner/learner-inl.hpp"
 #include "xgboost/data.h"
 #endif
+
+
+#ifdef LOCAL
+#include "stdc++.h"
+#else
+#include <bits/stdc++.h>
+#endif
+
+#include <iostream>
+#include <sys/time.h>
 
 using namespace std;
 
@@ -53,8 +54,6 @@ using namespace std;
 #define REP(i,a)    FOR(i,0,a)
 #define ZERO(m)     memset(m,0,sizeof(m))
 #define ALL(x)      x.begin(),x.end()
-#define PB          push_back
-#define S           size()
 #define LL          long long
 #define ULL         unsigned long long
 #define LD          long double
@@ -72,44 +71,67 @@ using namespace std;
 #define VS          VC < string >
 #define VVS         VC < VS >
 
-template<class T> void print(VC < T > v) {cerr << "[";if (v.S) cerr << v[0];FOR(i, 1, v.S) cerr << ", " << v[i];cerr << "]" << endl;}
+template<class T> void print(VC < T > v) {cerr << "[";if (v.size()) cerr << v[0];FOR(i, 1, v.size()) cerr << ", " << v[i];cerr << "]" << endl;}
 
-VS splt(string s, char c = ',') {
+template <class T>
+void concatenate(VC<T> &first, const VC<T> &second) {
+    size_t size = second.size();
+    if (first.size() < size) {
+        // resize
+        first.resize(size);
+    }
+    // update
+    for (int i = 0; i < size; i++) {
+        first[i] += second[i];
+    }
+}
+
+inline VS splt(string s, char c = ',') {
     VS all;
     int p = 0, np;
     while (np = s.find(c, p), np >= 0) {
         if (np != p)
-            all.PB(s.substr(p, np - p));
+            all.push_back(s.substr(p, np - p));
         else
-            all.PB("");
+            all.push_back("");
         p = np + 1;
     }
     if (p < s.size())
-        all.PB(s.substr(p));
+        all.push_back(s.substr(p));
     return all;
 }
 
 static bool LOG_DEBUG = true;
+/*! the message buffer length */
+const int kPrintBuffer = 1 << 12;
+inline void Printf(const char *fmt, ...) {
+    if (LOG_DEBUG) {
+        std::string msg(kPrintBuffer, '\0');
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(&msg[0], kPrintBuffer, fmt, args);
+        va_end(args);
+        fprintf(stderr, "%s", msg.c_str());
+    }
+}
 
-double getTime() {
+inline void Assert(bool exp, const char *fmt, ...) {
+    if (!exp) {
+        std::string msg(kPrintBuffer, '\0');
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(&msg[0], kPrintBuffer, fmt, args);
+        va_end(args);
+        fprintf(stderr, "AssertError:%s\n", msg.c_str());
+        exit(-1);
+    }
+}
+
+
+inline double getTime() {
     timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec + 1e-6 * tv.tv_usec;
-}
-
-struct GBTConfig {
-    double sampling_size_ratio = 0.5;
-    double learning_rate = 0.01;
-    int tree_number = 130;
-    int tree_min_nodes = 10;
-    int tree_depth = 3;
-};
-
-void parseData(const VS &data, const int startIndex, VC<Entry> &v) {
-    int index = startIndex;
-    for (const string &s : data) {
-        v.PB(Entry(index++, s));
-    }
 }
 
 template<class bidiiter> bidiiter random_unique(bidiiter begin, bidiiter end, size_t num_random) {
@@ -131,12 +153,9 @@ class RandomSample {
     int m_number;
     
 public:
-    RandomSample(int max, int number) {
-        m_max = max;
-        m_number = number;
-    }
+    RandomSample(int max, int number) : m_max(max), m_number(number) {}
     
-    VI get_sample_index() {
+    inline VI get_sample_index() {
         // fill vector with indices
         VI re_res(m_max);
         for (int i = 0; i < m_max; ++i)
@@ -164,12 +183,8 @@ struct Node {
     Node *m_right_child = NULL;
     
     // Construction function
-    Node(double value, int feature_index, double value_left, double value_right) {
-        m_node_value = value;
-        m_feature_index = feature_index;
-        m_terminal_left = value_left;
-        m_terminal_right = value_right;
-    }
+    Node(double value, int feature_index, double value_left, double value_right) :
+    m_node_value(value), m_feature_index(feature_index), m_terminal_left(value_left), m_terminal_right(value_right) {}
     
 private:
     
@@ -178,41 +193,34 @@ private:
 };
 
 struct BestSplit {
+    // the index of split feature
     int m_feature_index;
+    // the calculated node value
     double m_node_value;
+    // if false - split failed
     bool m_status;
     
     // construction function
-    BestSplit() {
-        m_feature_index = 0;
-        m_node_value = 0.0;
-        m_status = false; // by default, it fails
-    }
+    BestSplit() : m_feature_index(0.0), m_node_value(0.0), m_status(false) {}
 };
 
 struct SplitRes {
     VC<VD> m_feature_left;
     VC<VD> m_feature_right;
-    double m_left_value;
-    double m_right_value;
+    double m_left_value = 0.0;
+    double m_right_value = 0.0;
     VD m_obs_left;
     VD m_obs_right;
     
     // construction function
-    SplitRes() {
-        m_left_value = 0.0;
-        m_right_value = 0.0;
-    }
+    SplitRes() : m_left_value(0.0), m_right_value(0.0) {}
 };
 
 struct ListData {
     double m_x;
     double m_y;
     
-    ListData(double x, double y) {
-        m_x = x;
-        m_y = y;
-    }
+    ListData(double x, double y) : m_x(x), m_y(y) {}
     
     bool operator < (const ListData& str) const {
         return (m_x < str.m_x);
@@ -224,32 +232,30 @@ typedef enum _TerminalType {
 }TerminalType;
 
 class RegressionTree {
-public:
+private:
     // class members
     int m_min_nodes;
     int m_max_depth;
     int m_current_depth;
     TerminalType m_type;
     
+public:
     // The root node
     Node *m_root = NULL;
+    // The features importance per index
+    VI features_importance;
     
     // construction function
-    RegressionTree() {
-        m_min_nodes = 10;
-        m_max_depth = 3;
-        m_current_depth = 0;
-        m_type = AVERAGE;
-    }
+    RegressionTree() : m_min_nodes(10), m_max_depth(3), m_current_depth(0), m_type(AVERAGE) {}
     
     // set parameters
     void setMinNodes(int min_nodes) {
-        assert(min_nodes > 3);
+        Assert(min_nodes > 3, "The number of terminal nodes is too small: %i", min_nodes);
         m_min_nodes = min_nodes;
     }
     
     void setDepth(int depth) {
-        assert(depth > 0);
+        Assert(depth > 0, "Tree depth must be positive: %i", depth);
         m_max_depth = depth;
     }
     
@@ -297,11 +303,15 @@ public:
      *  The method to build regression tree
      */
     void buildRegressionTree(const VC<VD> &feature_x, const VD &obs_y) {
-        int feature_num = feature_x.size();
+        int samples_num = feature_x.size();
         
-        assert(feature_num == obs_y.size() && feature_num != 0);
+        Assert(samples_num == obs_y.size() && samples_num != 0,
+               "The number of samles does not match with the number of observations or the samples number is 0. Samples: %i", samples_num);
         
-        assert (m_min_nodes * 2 <= feature_num);
+        Assert (m_min_nodes * 2 <= samples_num, "The number of samples is too small");
+        
+        int feature_dim = feature_x[0].size();
+        features_importance.resize(feature_dim, 0);
         
         // build the regression tree
         buildTree(feature_x, obs_y);
@@ -320,9 +330,9 @@ private:
             return split_point;
         }
         
-        int feature_num = feature_x.size();
+        int samples_num = feature_x.size();
         
-        if (m_min_nodes * 2 > feature_num) {
+        if (m_min_nodes * 2 > samples_num) {
             // the number of observations in terminals is too small
             return split_point;
         }
@@ -339,8 +349,8 @@ private:
             
             // get data sorted by the loop_i-th feature
             VC<ListData> list_feature;
-            for (int loop_j = 0; loop_j < feature_num; loop_j++) {
-                list_feature.PB(ListData(feature_x[loop_j][loop_i], obs_y[loop_j]));
+            for (int loop_j = 0; loop_j < samples_num; loop_j++) {
+                list_feature.push_back(ListData(feature_x[loop_j][loop_i], obs_y[loop_j]));
             }
             
             // sort the list
@@ -363,8 +373,9 @@ private:
                 count_left++;
             }
             mean_left = sum_left / count_left;
+            
             // initialize right
-            for (int loop_j = m_min_nodes; loop_j < feature_num; loop_j++) {
+            for (int loop_j = m_min_nodes; loop_j < samples_num; loop_j++) {
                 ListData fetched_data = list_feature[loop_j];
                 sum_right += fetched_data.m_y;
                 count_right++;
@@ -388,7 +399,7 @@ private:
             }
             
             // begin to find the best split point for the feature
-            for (int loop_j = m_min_nodes; loop_j <= feature_num - m_min_nodes - 1; loop_j++) {
+            for (int loop_j = m_min_nodes; loop_j <= samples_num - m_min_nodes - 1; loop_j++) {
                 ListData fetched_data = list_feature[loop_j];
                 double y = fetched_data.m_y;
                 sum_left += y;
@@ -436,18 +447,18 @@ private:
         int feature_index = best_split.m_feature_index;
         double node_value = best_split.m_node_value;
         
-        int count = obs_y.size();
-        for (int loop_i = 0; loop_i < count; loop_i++) {
+        int samples_count = obs_y.size();
+        for (int loop_i = 0; loop_i < samples_count; loop_i++) {
             VD ith_feature = feature_x[loop_i];
             if (ith_feature[feature_index] < node_value) {
                 // append to the left feature
-                split_res.m_feature_left.PB(ith_feature);
+                split_res.m_feature_left.push_back(ith_feature);
                 // observation
-                split_res.m_obs_left.PB(obs_y[loop_i]);
+                split_res.m_obs_left.push_back(obs_y[loop_i]);
             } else {
                 // append to the right
-                split_res.m_feature_right.PB(ith_feature);
-                split_res.m_obs_right.PB(obs_y[loop_i]);
+                split_res.m_feature_right.push_back(ith_feature);
+                split_res.m_obs_right.push_back(obs_y[loop_i]);
             }
         }
         
@@ -526,6 +537,9 @@ private:
             return NULL;
         }
         
+        // update feature importance info
+        features_importance[best_split.m_feature_index] += 1;
+        
         // split the data
         SplitRes split_data = splitData(feature_x, obs_y, best_split);
         
@@ -550,19 +564,16 @@ private:
     }
 };
 
-class ResultFunction {
+class PredictionForest {
 public:
     // class members
     double m_init_value;
+    // the tree forest
     VC<RegressionTree> m_trees;
     double m_combine_weight;
     
     // construction function
-    ResultFunction(double learning_rate) {
-        m_init_value = 0.0;
-        m_combine_weight = learning_rate;
-    }
-    
+    PredictionForest(double learning_rate) : m_init_value(0.0), m_combine_weight(learning_rate) {}
     
     /**
      * The method to make prediction for estimate of function's value from provided features
@@ -583,44 +594,39 @@ public:
         
         return re_res;
     }
+    
+    /**
+     * Calculates importance of each feature in input samples
+     */
+    VI featureImportances() {
+        VI importances;
+        for (int i = 0; i < m_trees.size(); i++) {
+            concatenate(importances, m_trees[i].features_importance);
+        }
+        return importances;
+    }
 };
 
 
 class GradientBoostingTree {
     // class members
-    double m_sampling_size_ratio;
-    double m_learning_rate;
-    int m_tree_number;
+    double m_sampling_size_ratio = 0.5;
+    double m_learning_rate = 0.01;
+    int m_tree_number = 100;
     
     // tree related parameters
-    int m_tree_min_nodes;
-    int m_tree_depth;
+    int m_tree_min_nodes = 10;
+    int m_tree_depth = 3;
     
 public:
     
     GradientBoostingTree(double sample_size_ratio, double learning_rate,
-                         int tree_number, int tree_min_nodes, int tree_depth) {
-        // This will be called when initialize the class with parameters
-        
-        /*
-         *  Check the validity of numbers
-         */
-        assert(sample_size_ratio > 0 && learning_rate > 0 && tree_number > 0 && tree_min_nodes >= 3 && tree_depth > 0);
-        
-        // In the gradient method, the portion of "sample_size_ration"
-        // will be sampled without
-        // replacement.
-        m_sampling_size_ratio = sample_size_ratio;
-        
-        // Set learning rate or the shrink-age factor
-        m_learning_rate = learning_rate;
-        
-        // set the number of trees
-        m_tree_number = tree_number;
-        
-        // set tree parameters
-        m_tree_min_nodes = tree_min_nodes;
-        m_tree_depth = tree_depth;
+                         int tree_number, int tree_min_nodes, int tree_depth) :
+    m_sampling_size_ratio(sample_size_ratio), m_learning_rate(learning_rate), m_tree_number(tree_number),
+    m_tree_min_nodes(tree_min_nodes), m_tree_depth(tree_depth) {
+        // Check the validity of numbers
+        Assert(sample_size_ratio > 0 && learning_rate > 0 && tree_number > 0 && tree_min_nodes >= 3 && tree_depth > 0,
+               "Wrong parameters");
     }
     
     /**
@@ -630,15 +636,16 @@ public:
      * @param input_x the input features
      * @param input_y the ground truth values - one per features row
      */
-    ResultFunction *fitGradientBoostingTree(const VC<VD> &input_x, const VD &input_y) {
+    PredictionForest *fitGradientBoostingTree(const VC<VD> &input_x, const VD &input_y) {
         
-        // initialize the final result
-        ResultFunction *res_fun = new ResultFunction(m_learning_rate);
+        // initialize forest
+        PredictionForest *res_fun = new PredictionForest(m_learning_rate);
         
         // get the feature dimension
         int feature_num = input_y.size();
         
-        assert(feature_num == input_x.size() && feature_num > 0);
+        Assert(feature_num == input_x.size() && feature_num > 0,
+               "Error: The input_x size should not be zero and should match the size of input_y");
         
         // get an initial guess of the function
         double mean_y = 0.0;
@@ -666,7 +673,7 @@ public:
             VD gradient;
             index = 0;
             for (double d : input_y) {
-                gradient.PB(d - h_value[index]);
+                gradient.push_back(d - h_value[index]);
                 
                 // next
                 index++;
@@ -688,8 +695,8 @@ public:
                 
                 for (int sel_index : sampled_index) {
                     // assign value
-                    train_y.PB(gradient[sel_index]);
-                    train_x.PB(input_x[sel_index]);
+                    train_y.push_back(gradient[sel_index]);
+                    train_x.push_back(input_x[sel_index]);
                 }
                 
                 // fit a regression tree
@@ -713,7 +720,7 @@ public:
                     continue;
                 }
                 
-                res_fun->m_trees.PB(tree);
+                res_fun->m_trees.push_back(tree);
                 
                 // update h_value information, prepare for the next iteration
                 int sel_index = 0;
@@ -743,7 +750,7 @@ public:
                     break;
                 }
                 // store tree information
-                res_fun->m_trees.PB(tree);
+                res_fun->m_trees.push_back(tree);
                 
                 // update h_value information, prepare for the next iteration
                 for (int loop_index = 0; loop_index < feature_num; loop_index++) {
@@ -761,12 +768,13 @@ public:
         return res_fun;
     }
     
-    ResultFunction *learnGradientBoostingRanker(const VC<VD> &input_x, const VC<VD> &input_y, const double tau) {
-        ResultFunction *res_fun = new ResultFunction(m_learning_rate);
+    PredictionForest *learnGradientBoostingRanker(const VC<VD> &input_x, const VC<VD> &input_y, const double tau) {
+        PredictionForest *res_fun = new PredictionForest(m_learning_rate);
         
         int feature_num = input_x.size();
         
-        assert(feature_num == input_y.size() && feature_num > 0);
+        Assert(feature_num == input_y.size() && feature_num > 0,
+               "The size of input_x should be the same as the size of input_y");
         
         VD h_value_x(feature_num, 0);
         VD h_value_y(feature_num, 0);
@@ -786,17 +794,17 @@ public:
             for (int i = 0; i < sampled_index.size(); i++) {
                 int sel_index = sampled_index[i];
                 
-                gradient_x.PB(input_x[sel_index]);
-                gradient_x.PB(input_y[sel_index]);
+                gradient_x.push_back(input_x[sel_index]);
+                gradient_x.push_back(input_y[sel_index]);
                 
                 // get sample data
                 if (h_value_x[sel_index] < h_value_y[sel_index] + tau) {
                     double neg_gradient = h_value_y[sel_index] + tau - h_value_x[sel_index];
-                    gradient_y.PB(neg_gradient);
-                    gradient_y.PB(-1 * neg_gradient);
+                    gradient_y.push_back(neg_gradient);
+                    gradient_y.push_back(-1 * neg_gradient);
                 } else {
-                    gradient_y.PB(0.0);
-                    gradient_y.PB(0.0);
+                    gradient_y.push_back(0.0);
+                    gradient_y.push_back(0.0);
                 }
                 //                cerr << "sel_index: " << sel_index << endl;
             }
@@ -813,7 +821,7 @@ public:
             }
             
             // update information
-            res_fun->m_trees.PB(tree);
+            res_fun->m_trees.push_back(tree);
             
             double err = 0.0;
             
@@ -837,12 +845,115 @@ public:
     }
 };
 
+//
+// ------------------------------------------------------
+//
 
-void imputation(VC<Entry> &entries) {
+struct Entry {
+    static constexpr double NVL = -1000;
+    
+    // The number of features
+    static constexpr int fCount = 22;
+    
+    int id;
+    VD features;
+    double dv;
+    std::string formula;
+    bool completeFeatures = true;
+    VI missedFeatures;
+    
+    bool important[fCount];
+    
+    inline static double parse(const std::string &s) {
+        return s == "" ? NVL : atof(s.c_str());
+    }
+    
+    Entry(int sId) {
+        id = sId;
+        initImportanceVector();
+    }
+    
+    Entry(int sId, const std::string &s) {
+        id = sId;
+        initImportanceVector();
+        VS vs = splt(s, ',');
+        int index = 0;
+        REP(i, fCount) {
+            if (i == 14) {
+                formula = vs[i];
+            } else {
+                double f = parse(vs[i]);
+                // check if feature marked as important
+                if (important[index]) {
+                    features.push_back(f);
+                    if (f == NVL) {
+                        completeFeatures = false;
+                        // store missed feature
+                        missedFeatures.push_back(index);
+                    }
+                }
+                index++;
+            }
+        }
+        
+        // set DV if present
+        if (vs.size() == fCount + 1) {
+            dv = parse(vs[fCount]);
+            if (dv < 0) {
+                // missed activity
+                dv = NVL;
+            }
+        } else {
+            dv = NVL;
+        }
+    }
+    
+    inline bool operator < (const Entry& entry) const {
+        return (dv < entry.dv);
+    }
+    
+private:
+    inline void initImportanceVector() {
+#ifdef USE_FEATURES_PRUNNING
+        //        int indexes[] = {2, 7, 16, 18, 12, 11, 20, 1, 5}; // 902627.26
+        //        int indexes[] = {3, 2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15, 17}; // 910678.93
+        //        int indexes[] = {2, 9, 16, 12, 7, 6, 18, 11, 8, 1, 20, 5, 0, 14, 15}; // 910676.63
+        //        int indexes[] = {2, 9, 7, 5, 16, 8, 11, 18, 12, 1, 14, 20, 6, 10, 15, 17, 19}; // 902973.90
+        //        int indexes[] = {7, 2, 8, 9, 12, 6, 5, 16, 15, 14, 17, 10, 20, 11, 18, 0, 19, 1, 4, 3}; // 893954.08
+        
+        int indexes[] = {1, 2, 7, 9, 12, 5, 16, 8, 6, 18, 20, 14, 15, 11, 17, 0, 10, 19, 4}; // 901736.64
+        
+        for (int i = 0; i < fCount; i++) important[i] = false;
+        int sizeIn = (sizeof(indexes)/sizeof(*indexes));
+        for (int i = 0; i < sizeIn; i++) {
+            important[indexes[i]] = true;
+        }
+#else
+        for (int i = 0; i < fCount; i++) important[i] = true;
+#endif
+    }
+};
+
+struct GBTConfig {
+    double sampling_size_ratio = 0.5;
+    double learning_rate = 0.01;
+    int tree_number = 130;
+    int tree_min_nodes = 10;
+    int tree_depth = 3;
+};
+
+inline void parseData(const VS &data, const int startIndex, VC<Entry> &v) {
+    int index = startIndex;
+    for (const string &s : data) {
+        v.push_back(Entry(index++, s));
+    }
+}
+
+inline void imputation(VC<Entry> &entries) {
     VD vals(Entry::fCount, 0);
     VD counts(Entry::fCount, 0);
     int size = entries.size();
-    // calculate mean for all features
+    // calculate mean for all features per feature
     for (int i = 0 ; i < size; i++) {
         for (int j = 0; j < entries[i].features.size(); j++) {
             if (entries[i].features[j] != Entry::NVL) {
@@ -872,17 +983,12 @@ void imputation(VC<Entry> &entries) {
             }
             entries[i].completeFeatures = true;
             samplesCorrected++;
-            
-            //            if (LOG_DEBUG) {
-            //                cerr << "Feature: " << entries[i].id << " = ";
-            //                print<double>(entries[i].features);
-            //            }
         }
     }
-    if (LOG_DEBUG) cerr << "Samples corrected: " << samplesCorrected << endl;
+    Printf("Samples corrected: %i\n", samplesCorrected);
 };
 
-void imputation(VC<Entry>&training, VC<Entry>&testing) {
+inline void imputation(VC<Entry>&training, VC<Entry>&testing) {
     int X = training.size();
     int Y = testing.size();
     // join vectors
@@ -902,7 +1008,7 @@ void imputation(VC<Entry>&training, VC<Entry>&testing) {
     testing.insert(testing.begin(), fullSet.begin() + X, fullSet.end());
 };
 
-pair<int, int> correctZeroDVBySimilarity(const VC<VD> &matrix, VC<Entry> &training) {
+inline pair<int, int> correctZeroDVBySimilarity(const VC<VD> &matrix, VC<Entry> &training) {
     int X = training.size();
     int count = 0;
     int missedFeaturesSamples = 0;
@@ -936,7 +1042,7 @@ pair<int, int> correctZeroDVBySimilarity(const VC<VD> &matrix, VC<Entry> &traini
 
 // X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
 // X_scaled = X_std * (max - min) + min
-void scaleMinMax(VC<Entry> &entries, double min, double max) {
+inline void scaleMinMax(VC<Entry> &entries, double min, double max) {
     int size = entries.size();
     // fin min/max per sample per feature
     VD fMins(size, 10000), fMaxs(size, -10000);
@@ -966,7 +1072,7 @@ void scaleMinMax(VC<Entry> &entries, double min, double max) {
 }
 // X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
 // X_scaled = X_std * (max - min) + min
-void scaleDVMinMax(VC<Entry> &entries, double min, double max) {
+inline void scaleDVMinMax(VC<Entry> &entries, double min, double max) {
     int size = entries.size();
     double Y_min = 10000;
     double Y_max = -10000;
@@ -980,7 +1086,7 @@ void scaleDVMinMax(VC<Entry> &entries, double min, double max) {
             Y_min = val;
         }
     }
-    cerr << "Y_min: " << Y_min << ", Y_max:  " << Y_max << endl;
+    Printf("Y_min: %f, Y_max: %f\n", Y_min, Y_max);
     
     // find Y scaled
     for (int i = 0 ; i < size; i++) {
@@ -989,11 +1095,11 @@ void scaleDVMinMax(VC<Entry> &entries, double min, double max) {
         double Y_scaled = Y_std * (max - min) + min;
         entries[i].dv = Y_scaled;
         
-        cerr << "Entry id: " << entries[i].id << ", dv:  " << entries[i].dv << endl;
+        Printf("Entry id: %i, dv: %f\n", entries[i].id, entries[i].dv);
     }
 }
 
-VD createClassificationLabels(VC<Entry> entries) {
+inline VD createClassificationLabels(VC<Entry> entries) {
     VD labels;
     int X = entries.size();
     int lIndex = 0;
@@ -1010,7 +1116,7 @@ VD createClassificationLabels(VC<Entry> entries) {
             }
             if (!labelSet) {
                 // assign new label to the DV and store last value
-                labels.PB(entries[i].dv);
+                labels.push_back(entries[i].dv);
                 entries[i].dv = lIndex;
                 lIndex++;
             }
@@ -1020,7 +1126,7 @@ VD createClassificationLabels(VC<Entry> entries) {
 }
 
 #ifndef USE_REGERESSION
-void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool test) {
+inline void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool test) {
     int X = entries.size();
     for (int i = 0; i < X; i++) {
         if (test || entries[i].dv != Entry::NVL) {
@@ -1054,7 +1160,7 @@ void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool 
 #endif
 
 #ifdef USE_XGBOOST
-void readParamMatrix(const VC<Entry> &entries, xgboost::io::DMatrixSimple &dMatrix) {
+inline void readParamMatrix(const VC<Entry> &entries, xgboost::io::DMatrixSimple &dMatrix) {
     int entriesSize = entries.size();
     cerr << entriesSize << endl;
     std::vector<xgboost::RowBatch::Entry> feats;
@@ -1068,7 +1174,7 @@ void readParamMatrix(const VC<Entry> &entries, xgboost::io::DMatrixSimple &dMatr
         }
         
         // collect DV
-        dMatrix.info.labels.PB((float)entries[i].dv);
+        dMatrix.info.labels.push_back((float)entries[i].dv);
         // add row batch
         dMatrix.AddRow(feats);
         
@@ -1095,9 +1201,9 @@ public:
         }
         VD row;
         for (double &d : similarities) {
-            row.PB(d);
+            row.push_back(d);
         }
-        matrix.PB(row);
+        matrix.push_back(row);
         
         return 0;
     }
@@ -1106,7 +1212,7 @@ public:
         X = train.size();
         Y = test.size();
         
-        cerr << "GB SC Training length:" << X << ", testing length: " << Y << endl;
+        Printf( "GB SC Training length: %i, testing length: %i\n", X, Y);
         
         // parse data
         VC<Entry> training;
@@ -1138,13 +1244,14 @@ public:
 private:
 #ifdef USE_XGBOOST
     VI renkByXGBRegression(VC<Entry> &training, VC<Entry> &testing) {
-        cerr << "=========== Rank by XGBoost regression ===========" << endl;
+        Printf("=========== Rank by XGBoost regression ===========\n");
         
         //
         // correct missed DV in training data
         //
         pair<int, int> correctedPair = correctZeroDVBySimilarity(matrix, training);
-        cerr << "Corrected: " << correctedPair.first << ", found samples with missed features: " << correctedPair.second << endl;
+        
+        Printf("Corrected: %i, found samples with missed features: %i\n", correctedPair.first, correctedPair.second);
         
         double startTime = getTime();
         
@@ -1178,12 +1285,12 @@ private:
         learner.SetParam("silent", "1");
         
         
-        cerr << "Model configuration: " << endl;
+        Printf("Model configuration\n");
         
         // print configs
         std::vector< std::pair<std::string, std::string> > cfg = learner.cfg_;
         for (int i = 0; i < cfg.size(); i++) {
-            cerr << cfg[i].first << "=" << cfg[i].second << endl;
+            Printf("%s=%s\n", cfg[i].first.c_str(), cfg[i].second.c_str());
         }
 
         
@@ -1254,18 +1361,18 @@ private:
         for (int i = 0; i < num_round; ++i) {
             
             elapsed = (unsigned long)(time(NULL) - start);
-            xgboost::utils::Printf("boosting round %d, %lu sec elapsed\n", i, elapsed);
+            Printf("boosting round %d, %lu sec elapsed\n", i, elapsed);
             
             learner.UpdateOneIter(i, trainMat);
             std::string res = learner.EvalOneIter(i, devalall, eval_data_names);
             
-            xgboost::utils::Printf("%s\n ", res.c_str());
+            Printf("%s\n ", res.c_str());
             elapsed = (unsigned long)(time(NULL) - start);
         }
         
         xgboost::utils::FeatMap fmap;
         std::vector<std::string> model = learner.DumpModel(fmap, 1);
-        cerr << "Dumped model size: " << model.size() << endl;
+        Printf("Dumped model size: %lu\n", model.size());
 //        for (int i = 0; i < model.size(); i++) {
 //            xgboost::utils::Printf("%s\n ", model[i].c_str());
 //        }
@@ -1289,14 +1396,14 @@ private:
         
         VI ids;
         for (int i = 0; i < Y; i++) {
-            if (LOG_DEBUG) cerr << "ID: " << testing[i].id << ", activity: " << testing[i].dv << endl;
+            Printf("ID: %i, activity: %f\n", testing[i].id, testing[i].dv);
             
-            ids.PB(testing[i].id);
+            ids.push_back(testing[i].id);
         }
         
         double finishTime = getTime();
         
-        cerr << "Train time: " << rankTime - startTime << ", rank time: " <<  finishTime - rankTime  << ", full time: " << finishTime - startTime << endl;
+        Printf("Train time: %.2f, rank time: %.2f, full time: .2f\n", rankTime - startTime,  finishTime - rankTime, finishTime - startTime);
         
         return ids;
     }
@@ -1305,16 +1412,16 @@ private:
 #ifndef USE_REGERESSION
     VI rankByClassification(VC<Entry> &training, VC<Entry> &testing) {
         
-        cerr << "=========== Rank by classification ===========" << endl;
+        Printf("=========== Rank by classification ===========\n");
         
         double startTime = getTime();
         
         // make classification labels
         VD labels = createClassificationLabels(training);
         if (LOG_DEBUG) {
-            cerr << "Labels ++++++++++++++++" << endl;
+            Printf("Labels ++++++++++++++++");
             print<double>(labels);
-            cerr << "Labels size: " << labels.size() << endl;
+            Printf("Labels size: %i\n", labels.size());
         }
         
         // prepare WNN data
@@ -1356,7 +1463,7 @@ private:
         for (int i = 0; i < Y; i++) {
             if (LOG_DEBUG) cerr << "ID: " << testing[i].id << ", activity: " << testing[i].dv << endl;
             
-            ids.PB(testing[i].id);
+            ids.push_back(testing[i].id);
         }
         
         cerr << "Rank time: " << rankTime - startTime << ", full time: " << finishTime - startTime << endl;
@@ -1393,8 +1500,8 @@ private:
         for (int i = 0; i < X; i++) {
             if (training[i].dv != Entry::NVL) {
                 // check for DV set only for training data and add TEST data without checks
-                input_x.PB(training[i].features);
-                input_y.PB(training[i].dv);
+                input_x.push_back(training[i].features);
+                input_y.push_back(training[i].dv);
             } else if (LOG_DEBUG){
                 //                cerr << "Entry id: " << e.id << " missing DV" << endl;
             }
@@ -1423,7 +1530,7 @@ private:
             
             VC<Entry> rankList;
             rank(input_x, input_y, testing, conf, rankList);
-            passRes.PB(rankList);
+            passRes.push_back(rankList);
         }
         
         double rankTime = getTime();
@@ -1440,7 +1547,7 @@ private:
             meanDv /= pass_num;
             Entry mean_entry(id);
             mean_entry.dv = meanDv;
-            meanResults.PB(mean_entry);
+            meanResults.push_back(mean_entry);
         }
         
         double finishTime = getTime();
@@ -1457,7 +1564,7 @@ private:
         for (int i = 0; i < Y; i++) {
             if (LOG_DEBUG) cerr << "ID: " << meanResults[i].id << ", activity: " << meanResults[i].dv << endl;
             
-            ids.PB(meanResults[i].id);
+            ids.push_back(meanResults[i].id);
         }
         
         cerr << "pass_num: " << pass_num << ", learning_rate: " << conf.learning_rate << ", tree_min_nodes: " << conf.tree_min_nodes
@@ -1473,23 +1580,30 @@ private:
         //        for (double y : input_y) {
         //            VD yList;
         //            for (int i = 0; i < feature_dim; i++) {
-        //                yList.PB(y);
+        //                yList.push_back(y);
         //            }
         //
-        //            input_yy.PB(yList);
+        //            input_yy.push_back(yList);
         //        }
         
         // train
         GradientBoostingTree tree(conf.sampling_size_ratio, conf.learning_rate, conf.tree_number, conf.tree_min_nodes, conf.tree_depth);
-        ResultFunction *predictor = tree.fitGradientBoostingTree(input_x, input_y);
+        PredictionForest *predictor = tree.fitGradientBoostingTree(input_x, input_y);
         //        ResultFunction *predictor = tree.learnGradientBoostingRanker(input_x, input_yy, .21);
+        
+        Printf("Features importance++++++++++++++++\n");
+        VI importance = predictor->featureImportances();
+        for (int i = 0; i < importance.size(); i++) {
+            Printf("%i : %i | ", i, importance[i]);
+        }
+        Printf("\n");
         
         // predict
         int test_N = testing.size();
         for (int i = 0; i < test_N; i++) {
             Entry resEntry(testing[i].id);
             resEntry.dv = predictor->predict(testing[i].features);
-            rank.PB(resEntry);
+            rank.push_back(resEntry);
         }
     }
     
@@ -1519,17 +1633,17 @@ private:
             }
             
             double corr = dvSum / wSum;
-            //            vals.PB(corr);
+            //            vals.push_back(corr);
             //            mae += abs(testDv - corr);
             
-            vals.PB(corr);
+            vals.push_back(corr);
             mae += abs(testDv - maxVal);
             
             //            if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", dvSum: " << dvSum << ", correction: " << corr << ", weights: " <<  wSum << endl;
             if (LOG_DEBUG) cerr << "TestDV: " << testDv << ", maxSim: " << maxSim << ", maxVal: " << maxVal << endl;
         }
         mae /= test.size();
-        if (LOG_DEBUG) cerr << "MAE: " << mae << endl;
+        Printf("MAE: %f\n", mae);
         
         int index = 0;
         for (Entry e : test) {
@@ -1546,22 +1660,24 @@ private:
             //
             //            }
             
-            if (LOG_DEBUG) cerr << "Entry: " << testId << " corrected with value: " << testDv << endl;
+            Printf("Entry: %i corrected with value: %f\n", testId, testDv);
             
             Entry resEntry(testId);
             resEntry.dv = testDv;
-            simResults.PB(resEntry);
+            simResults.push_back(resEntry);
             index++;
         }
     }
 };
 
+#ifndef FROM_TEST_RUNNER
+/*
 int main(int argc, const char * argv[]) {
     int X, Y;
     cin>>X;
     cin>>Y;
     
-    cerr << "X: " << X << ", Y: " << Y << endl;
+    Printf("X: %i, Y: %i\n",X ,Y);
     
     
     ActiveMolecules am;
@@ -1570,25 +1686,25 @@ int main(int argc, const char * argv[]) {
         REP(j, X+Y) {
             double sim;
             cin >> sim;
-            similarities.PB(sim);
+            similarities.push_back(sim);
         }
         // set similarities
         am.similarity(i, similarities);
     }
     
-    cerr << "Similarity set" << endl;
+    Printf("Similarity set\n");
     
     VS trainingData;
     REP(i, X) {
         string t;
         cin>>t;
-        trainingData.PB(t);
+        trainingData.push_back(t);
     }
     VS testingData;
     REP(i, Y) {
         string t;
         cin>>t;
-        testingData.PB(t);
+        testingData.push_back(t);
     }
     
     // do ranking
@@ -1599,12 +1715,14 @@ int main(int argc, const char * argv[]) {
     cout.flush();
     
     
-    cerr << "Training data size: " << trainingData.S << ", testing data size: " << testingData.S << ", return size: " << ret.S << endl;
+    Printf("Training data size: %lu, testing data size: %lu, return size: %lu\n", trainingData.size(), testingData.size(), ret.size());
     
     return 0;
 }
+ */
+#endif
 
-void saveModel(string fn, VVD &model) {
+inline void saveModel(string fn, VVD &model) {
     FILE *f = fopen(fn.c_str(), "a");
     for (VD &v : model) {
         for (double d : v) fprintf(f, "%.10lf ", d);
