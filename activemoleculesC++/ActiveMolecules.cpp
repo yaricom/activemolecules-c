@@ -416,7 +416,7 @@ private:
                 // current node value
                 current_node_value = (list_feature[loop_j + 1].m_x + fetched_data.m_x) / 2;
                 
-                if (current_err < min_err && (current_node_value != fetched_data.m_x)) {
+                if (current_err < min_err && current_node_value != fetched_data.m_x) {
                     split_index = loop_i;
                     node_value = current_node_value;
                     min_err = current_err;
@@ -570,7 +570,13 @@ public:
     double m_init_value;
     // the tree forest
     VC<RegressionTree> m_trees;
+    // the learning rate
     double m_combine_weight;
+    
+    // the OOB error value
+    double oob_error;
+    // the OOB samples size
+    int oob_samples_size;
     
     // construction function
     PredictionForest(double learning_rate) : m_init_value(0.0), m_combine_weight(learning_rate) {}
@@ -608,7 +614,7 @@ public:
 };
 
 
-class GradientBoostingTree {
+class GradientBoostingMachine {
     // class members
     double m_sampling_size_ratio = 0.5;
     double m_learning_rate = 0.01;
@@ -620,7 +626,7 @@ class GradientBoostingTree {
     
 public:
     
-    GradientBoostingTree(double sample_size_ratio, double learning_rate,
+    GradientBoostingMachine(double sample_size_ratio, double learning_rate,
                          int tree_number, int tree_min_nodes, int tree_depth) :
     m_sampling_size_ratio(sample_size_ratio), m_learning_rate(learning_rate), m_tree_number(tree_number),
     m_tree_min_nodes(tree_min_nodes), m_tree_depth(tree_depth) {
@@ -636,31 +642,35 @@ public:
      * @param input_x the input features
      * @param input_y the ground truth values - one per features row
      */
-    PredictionForest *fitGradientBoostingTree(const VC<VD> &input_x, const VD &input_y) {
+    PredictionForest *train(const VC<VD> &input_x, const VD &input_y) {
         
         // initialize forest
         PredictionForest *res_fun = new PredictionForest(m_learning_rate);
         
-        // get the feature dimension
-        int feature_num = input_y.size();
+        // get the samples number
+        int samples_num = input_y.size();
         
-        Assert(feature_num == input_x.size() && feature_num > 0,
+        Assert(samples_num == input_x.size() && samples_num > 0,
                "Error: The input_x size should not be zero and should match the size of input_y");
+        
+        // holds indices of training data samples used for trees training
+        // this will be used later for OOB error calculation
+        VI used_indices(samples_num, -1);
         
         // get an initial guess of the function
         double mean_y = 0.0;
         for (double d : input_y) {
             mean_y += d;
         }
-        mean_y = mean_y / feature_num;
+        mean_y = mean_y / samples_num;
         res_fun->m_init_value = mean_y;
         
         
         // prepare the iteration
-        VD h_value(feature_num);
+        VD h_value(samples_num);
         // initialize h_value
         int index = 0;
-        while (index < feature_num) {
+        while (index < samples_num) {
             h_value[index] = mean_y;
             index += 1;
         }
@@ -684,7 +694,7 @@ public:
                 // sample without replacement
                 
                 // we need to sample
-                RandomSample sampler(feature_num, (int) (m_sampling_size_ratio * feature_num));
+                RandomSample sampler(samples_num, (int) (m_sampling_size_ratio * samples_num));
                 
                 // get random index
                 VI sampled_index = sampler.get_sample_index();
@@ -697,6 +707,9 @@ public:
                     // assign value
                     train_y.push_back(gradient[sel_index]);
                     train_x.push_back(input_x[sel_index]);
+                    
+                    // mark index as used
+                    used_indices[sel_index] = 1;
                 }
                 
                 // fit a regression tree
@@ -724,7 +737,7 @@ public:
                 
                 // update h_value information, prepare for the next iteration
                 int sel_index = 0;
-                while (sel_index < feature_num) {
+                while (sel_index < samples_num) {
                     h_value[sel_index] += m_learning_rate * tree.predict(input_x[sel_index]);
                     sel_index++;
                 }
@@ -753,7 +766,7 @@ public:
                 res_fun->m_trees.push_back(tree);
                 
                 // update h_value information, prepare for the next iteration
-                for (int loop_index = 0; loop_index < feature_num; loop_index++) {
+                for (int loop_index = 0; loop_index < samples_num; loop_index++) {
                     h_value[loop_index] += m_learning_rate * tree.predict(input_x[loop_index]);
                 }
             }
@@ -762,8 +775,25 @@ public:
             iter_index++;
         }
         
-        // set the learning rate and return
-        // res_fun.m_combine_weight = m_learning_rate;
+        // find OOB error
+        VI oob_data;
+        int i, sel_index;
+        for (i = 0; i < samples_num; i++) {
+            if (used_indices[i] < 0) {
+                oob_data.push_back(i);
+            }
+        }
+        double oob_error = 0.0, test_y;
+        for (i = 0; i < oob_data.size(); i++) {
+            sel_index = oob_data[i];
+            test_y = res_fun->predict(input_x[sel_index]);
+            oob_error += (input_y[sel_index] - test_y) * (input_y[sel_index] - test_y);
+        }
+        oob_error /= oob_data.size();
+        
+        // store OOB
+        res_fun->oob_error = oob_error;
+        res_fun->oob_samples_size = oob_data.size();
         
         return res_fun;
     }
@@ -1567,8 +1597,7 @@ private:
             ids.push_back(meanResults[i].id);
         }
         
-        cerr << "pass_num: " << pass_num << ", learning_rate: " << conf.learning_rate << ", tree_min_nodes: " << conf.tree_min_nodes
-        << ", tree_depth: " << conf.tree_depth <<  ", tree_number: " << conf.tree_number << endl;
+        cerr << "pass_num: " << pass_num << ", sampling_size_ratio: " << conf.sampling_size_ratio << ", learning_rate: " << conf.learning_rate << ", tree_min_nodes: " << conf.tree_min_nodes << ", tree_depth: " << conf.tree_depth <<  ", tree_number: " << conf.tree_number << endl;
         cerr << "Rank time: " << rankTime - startTime << ", full time: " << finishTime - startTime << endl;
         
         return ids;
@@ -1587,9 +1616,11 @@ private:
         //        }
         
         // train
-        GradientBoostingTree tree(conf.sampling_size_ratio, conf.learning_rate, conf.tree_number, conf.tree_min_nodes, conf.tree_depth);
-        PredictionForest *predictor = tree.fitGradientBoostingTree(input_x, input_y);
+        GradientBoostingMachine tree(conf.sampling_size_ratio, conf.learning_rate, conf.tree_number, conf.tree_min_nodes, conf.tree_depth);
+        PredictionForest *predictor = tree.train(input_x, input_y);
         //        ResultFunction *predictor = tree.learnGradientBoostingRanker(input_x, input_yy, .21);
+        
+        Printf("OOB error: %f, OOB samples size: %i\n", predictor->oob_error, predictor->oob_samples_size);
         
         Printf("Features importance++++++++++++++++\n");
         VI importance = predictor->featureImportances();
