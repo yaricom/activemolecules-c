@@ -8,13 +8,20 @@
 
 #define LOCAL true
 
-#define USE_REGERESSION
+//#define USE_REGERESSION
 //#define USE_XGBOOST
+#define USE_RANDOM_FOREST
+//#define USE_KNN_CLASSIFICATION
 
 //#define USE_FEATURES_PRUNNING
 
-#ifndef USE_REGERESSION
+#ifdef USE_KNN_CLASSIFICATION
 #include "WeightedKNN.h"
+#endif
+
+#ifdef USE_RANDOM_FOREST
+#include "andres/marray.hxx"
+#include "andres/ml/decision-trees.hxx"
 #endif
 
 #ifdef USE_XGBOOST
@@ -980,8 +987,8 @@ inline void parseData(const VS &data, const int startIndex, VC<Entry> &v) {
 }
 
 inline void imputation(VC<Entry> &entries) {
-    VD vals(Entry::fCount, 0);
-    VD counts(Entry::fCount, 0);
+    VD vals(Entry::fCount - 1, 0);
+    VD counts(Entry::fCount - 1, 0);
     int size = entries.size();
     // calculate mean for all features per feature
     for (int i = 0 ; i < size; i++) {
@@ -1155,7 +1162,7 @@ inline VD createClassificationLabels(VC<Entry> entries) {
     return labels;
 }
 
-#ifndef USE_REGERESSION
+#ifdef USE_KNN_CLASSIFICATION
 inline void readExamples(const VC<Entry> &entries, TRAINING_EXAMPLES_LIST *rlist, bool test) {
     int X = entries.size();
     for (int i = 0; i < X; i++) {
@@ -1255,25 +1262,107 @@ public:
         
         assert(training.size() == X && testing.size() == Y);
         
-#ifdef USE_REGERESSION
+
 #ifdef USE_XGBOOST
         // rank by XGBT regression
-        VI res = renkByXGBRegression(training, testing);
-#else
+        VI res = rankByXGBRegression(training, testing);
+#endif
+#ifdef USE_REGERESSION
         // rank by GBT regression
         VI res = rankByGBTRegression(training, testing);
 #endif
-#else
+#ifdef USE_KNN_CLASSIFICATION
         // rank by classification
         VI res = rankByClassification(training, testing);
-        
 #endif
+#ifdef USE_RANDOM_FOREST
+        // rank RF regression
+        VI res = rankRFRegression(training, testing);
+#endif
+
         return res;
     }
     
 private:
+#ifdef USE_RANDOM_FOREST
+    VI rankRFRegression(VC<Entry> &training, VC<Entry> &testing) {
+        Printf("=========== Rank by RF regression regression ===========\n");
+        const size_t numberOfSamples = training.size();
+        const size_t numberOfFeatures = Entry::fCount - 1;
+        
+        double startTime = getTime();
+        
+        // populate features
+        typedef double Feature;
+        const size_t shape[] = {numberOfSamples, numberOfFeatures};
+        andres::Marray<Feature> features(shape, shape + 2);
+        for(size_t sample = 0; sample < numberOfSamples; ++sample) {
+            for(size_t feature = 0; feature < numberOfFeatures; ++feature) {
+                features(sample, feature) = training[sample].features[feature];
+            }
+        }
+        // populate labels
+        typedef double Label;
+        andres::Marray<Label> labels(shape, shape + 1);
+        for(size_t sample = 0; sample < numberOfSamples; ++sample) {
+            labels(sample) = training[sample].dv;
+        }
+        
+        // learn decision forest
+        typedef double Probability;
+        andres::ml::DecisionForest<Feature, Label, Probability> decisionForest;
+        const size_t numberOfDecisionTrees = 10;
+        decisionForest.learn(features, labels, numberOfDecisionTrees);
+        
+        double rankTime = getTime();
+        
+        //
+        // predict probabilities for every label and every testing sample
+        //
+        const size_t testNum = testing.size();
+        const size_t testShape[] = {testNum, numberOfFeatures};
+        andres::Marray<Feature> testFeatures(testShape, testShape + 2);
+        for(size_t sample = 0; sample < testNum; ++sample) {
+            for(size_t feature = 0; feature < numberOfFeatures; ++feature) {
+                testFeatures(sample, feature) = testing[sample].features[feature];
+            }
+        }
+        
+        andres::Marray<Probability> probabilities(testShape, testShape + 2);
+        decisionForest.predict(testFeatures, probabilities);
+        
+        //
+        // Predict
+        //
+        VC<float>Y_test;
+        
+        // assign results
+        for (int i = 0; i < Y; i++) {
+            testing[i].dv = probabilities(i, 0);
+        }
+        
+        // sort
+        sort(testing.rbegin(), testing.rend());
+        
+        
+        VI ids;
+        for (int i = 0; i < Y; i++) {
+            Printf("ID: %i, activity: %f\n", testing[i].id, testing[i].dv);
+            
+            ids.push_back(testing[i].id);
+        }
+        
+        double finishTime = getTime();
+        
+        Printf("Train time: %.2f, rank time: %.2f, full time: .2f\n", rankTime - startTime,  finishTime - rankTime, finishTime - startTime);
+        
+        return ids;
+        
+    }
+#endif
+    
 #ifdef USE_XGBOOST
-    VI renkByXGBRegression(VC<Entry> &training, VC<Entry> &testing) {
+    VI rankByXGBRegression(VC<Entry> &training, VC<Entry> &testing) {
         Printf("=========== Rank by XGBoost regression ===========\n");
         
         //
@@ -1439,7 +1528,7 @@ private:
     }
 #endif
     
-#ifndef USE_REGERESSION
+#ifdef USE_KNN_CLASSIFICATION
     VI rankByClassification(VC<Entry> &training, VC<Entry> &testing) {
         
         Printf("=========== Rank by classification ===========\n");

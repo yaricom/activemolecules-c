@@ -57,7 +57,7 @@
 #include <algorithm> // std::sort
 #include <iterator> // std::distance
 
-#include "andres/marray.hxx"
+#include "../marray.hxx"
 
 /// The public API.
 namespace andres {
@@ -116,7 +116,7 @@ private:
     template<class RandomEngine>
         void sampleSubsetWithoutReplacement(const size_t, const size_t, 
             std::vector<size_t>&, RandomEngine&,
-            std::vector<size_t>& = std::vector<size_t>()
+            std::vector<size_t>& // = std::vector<size_t>()
         );
 
     size_t featureIndex_;
@@ -185,11 +185,11 @@ public:
     size_t size() const;
     const DecisionTreeType& decisionTree(const size_t) const;
     void predict(const andres::View<Feature>&, andres::Marray<Probability>&) const;
-    void learn(const andres::View<Feature>&, const andres::View<Label>&,
-        const size_t = 255);
+    void learn(const andres::View<Feature>& f, const andres::View<Label>& l,
+        const size_t t = 255);
     template<class RandomEngine>
-        void learn(const andres::View<Feature>&, const andres::View<Label>&,
-            const size_t, RandomEngine&);
+        void learn(const andres::View<Feature>& f, const andres::View<Label>& l,
+            const size_t treeSize, RandomEngine& rnd);
 
 private:
     template<class RandomEngine>
@@ -786,7 +786,8 @@ DecisionForest<FEATURE, LABEL, PROBABILITY>::learn(
     const size_t numberOfDecisionTrees
 ) {
     typedef std::default_random_engine RandomEngine;
-    learn<RandomEngine>(features, labels, numberOfDecisionTrees, RandomEngine());
+    RandomEngine rnd;
+    learn<RandomEngine>(features, labels, numberOfDecisionTrees, rnd);
 }
 
 /// Learns a decision forest from labeled samples as described by Breiman (2001).
