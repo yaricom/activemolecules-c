@@ -21,7 +21,6 @@ using namespace std;
 /*
  * The simple matrix implementation
  */
-
 class Matrix {
     /** Array for internal storage of elements. */
     VDD A;
@@ -108,15 +107,15 @@ public:
      * @param j Column index.
      * @return A(i,j)
      */
-    double get(const int i, const int j) {
+    double get(const int i, const int j) const {
         return A[i][j];
     }
     
     /**
      * Access the internal two-dimensional array.
      */
-    VDD getArray() {
-        return A;
+    VDD* getArray() {
+        return &A;
     }
     
     /**
@@ -154,7 +153,7 @@ public:
      * @param j Column index.
      * @param s A(i,j).
      */
-    void set(int i, int j, double s) {
+    inline void set(int i, int j, double s) {
         assert(i < m && j < n);
         A[i][j] = s;
     }
@@ -169,13 +168,12 @@ public:
      * @return A(i0:i1,j0:j1)
      */
     
-    Matrix* getMatrix(int i0, int i1, int j0, int j1) {
-        assert(i0 > 0 && i1 < m && j0 > 0 && j1 < n);
-        Matrix *X = new Matrix(i1 - i0 + 1, j1 - j0 + 1);
-        VDD B = X->getArray();
+    Matrix getMatrix(int i0, int i1, int j0, int j1) {
+        assert(i0 >= 0 && i0 < i1 && i1 < m && j0 >= 0 && j0 < j1 && j1 < n);
+        Matrix X(i1 - i0 + 1, j1 - j0 + 1);
         for (int i = i0; i <= i1; i++) {
             for (int j = j0; j <= j1; j++) {
-                B[i - i0][j - j0] = A[i][j];
+                X.set(i - i0, j - j0, A[i][j]);
             }
         }
         return X;
@@ -189,14 +187,13 @@ public:
      * @param c Array of column indices.
      * @return A(i0:i1,c(:))
      */
-    Matrix* getMatrix(const int i0, const int i1, const VI &c) {
-        assert(i0 > 0 && i1 < m && c.size() < n);
-        Matrix *X = new Matrix(i1 - i0 + 1, c.size());
-        VDD B = X->getArray();
+    Matrix getMatrix(const int i0, const int i1, const VI &c) {
+        assert(i0 >= 0 && i0 < i1 && i1 < m);
+        Matrix X(i1 - i0 + 1, c.size());
         for (int i = i0; i <= i1; i++) {
             for (int j = 0; j < c.size(); j++) {
-                assert(c[j] < n);
-                B[i - i0][j] = A[i][c[j]];
+                assert(c[j] < n && c[j] >= 0);
+                X.set(i - i0, j, A[i][c[j]]);
             }
         }
         return X;
@@ -216,14 +213,13 @@ public:
      *                Submatrix indices
      */
     
-    Matrix* getMatrix(const VI &r, const int j0, const int j1) {
-        assert(j0 > 0 && j1 < n && r.size() < m);
-        Matrix *X = new Matrix(r.size(), j1 - j0 + 1);
-        VDD B = X->getArray();
+    Matrix getMatrix(const VI &r, const int j0, const int j1) {
+        assert(j0 >= 0 && j0 < j1 && j1 < n);
+        Matrix X(r.size(), j1 - j0 + 1);
         for (int i = 0; i < r.size(); i++) {
-            assert(r[i] < m);
+            assert(r[i] < m && r[i] >= 0);
             for (int j = j0; j <= j1; j++) {
-                B[i][j - j0] = A[r[i]][j];
+                X.set(i, j - j0, A[r[i]][j]);
             }
         }
         return X;
@@ -232,81 +228,53 @@ public:
     /**
      * Set a submatrix.
      *
-     * @param i0
-     *            Initial row index
-     * @param i1
-     *            Final row index
-     * @param j0
-     *            Initial column index
-     * @param j1
-     *            Final column index
-     * @param X
-     *            A(i0:i1,j0:j1)
-     * @exception ArrayIndexOutOfBoundsException
-     *                Submatrix indices
+     * @param i0 Initial row index
+     * @param i1 Final row index
+     * @param j0 Initial column index
+     * @param j1 Final column index
+     * @param X A(i0:i1,j0:j1)
      */
-    
-    public void setMatrix(int i0, int i1, int j0, int j1, Matrix X) {
-        try {
-            for (int i = i0; i <= i1; i++) {
-                for (int j = j0; j <= j1; j++) {
-                    A[i][j] = X.get(i - i0, j - j0);
-                }
+    void setMatrix(const int i0, const int i1, const int j0, const int j1, const Matrix &X) {
+        assert(i0 >= 0 && i0 < i1 && i1 < m && j0 >= 0 && j0 < j1 && j1 < n);
+        for (int i = i0; i <= i1; i++) {
+            for (int j = j0; j <= j1; j++) {
+                A[i][j] = X.get(i - i0, j - j0);
             }
-        } catch (ArrayIndexOutOfBoundsException e) {
-            throw new ArrayIndexOutOfBoundsException("Submatrix indices");
         }
     }
     
     /**
      * Set a submatrix.
      *
-     * @param r
-     *            Array of row indices.
-     * @param c
-     *            Array of column indices.
-     * @param X
-     *            A(r(:),c(:))
-     * @exception ArrayIndexOutOfBoundsException
-     *                Submatrix indices
+     * @param r Array of row indices.
+     * @param c Array of column indices.
+     * @param X A(r(:),c(:))
      */
-    
-    public void setMatrix(int[] r, int[] c, Matrix X) {
-        try {
-            for (int i = 0; i < r.length; i++) {
-                for (int j = 0; j < c.length; j++) {
-                    A[r[i]][c[j]] = X.get(i, j);
-                }
+    void setMatrix(const VI &r, const VI &c, const Matrix &X) {
+        for (int i = 0; i < r.size(); i++) {
+            assert(r[i] < m && r[i] >= 0);
+            for (int j = 0; j < c.size(); j++) {
+                assert(c[j] < n && c[j] >= 0);
+                A[r[i]][c[j]] = X.get(i, j);
             }
-        } catch (ArrayIndexOutOfBoundsException e) {
-            throw new ArrayIndexOutOfBoundsException("Submatrix indices");
         }
     }
     
     /**
      * Set a submatrix.
      *
-     * @param r
-     *            Array of row indices.
-     * @param j0
-     *            Initial column index
-     * @param j1
-     *            Final column index
-     * @param X
-     *            A(r(:),j0:j1)
-     * @exception ArrayIndexOutOfBoundsException
-     *                Submatrix indices
+     * @param r Array of row indices.
+     * @param j0 Initial column index
+     * @param j1 Final column index
+     * @param X A(r(:),j0:j1)
      */
-    
-    public void setMatrix(int[] r, int j0, int j1, Matrix X) {
-        try {
-            for (int i = 0; i < r.length; i++) {
-                for (int j = j0; j <= j1; j++) {
-                    A[r[i]][j] = X.get(i, j - j0);
-                }
+    void setMatrix(const VI &r, const int j0, const int j1, const Matrix &X) {
+        assert(j0 >=0 && j0 < j1 && j1 < n);
+        for (int i = 0; i < r.size(); i++) {
+            assert(r[i] < m && r[i] >= 0);
+            for (int j = j0; j <= j1; j++) {
+                A[r[i]][j] = X.get(i, j - j0);
             }
-        } catch (ArrayIndexOutOfBoundsException e) {
-            throw new ArrayIndexOutOfBoundsException("Submatrix indices");
         }
     }
     
@@ -325,15 +293,13 @@ public:
      *                Submatrix indices
      */
     
-    public void setMatrix(int i0, int i1, int[] c, Matrix X) {
-        try {
-            for (int i = i0; i <= i1; i++) {
-                for (int j = 0; j < c.length; j++) {
-                    A[i][c[j]] = X.get(i - i0, j);
-                }
+    void setMatrix(const int i0, const int i1, const VI c, const Matrix &X) {
+        assert(i0 >= 0 && i0 < i1 && i1 < m);
+        for (int i = i0; i <= i1; i++) {
+            for (int j = 0; j < c.size(); j++) {
+                assert(c[j] < n && c[j] >= 0);
+                A[i][c[j]] = X.get(i - i0, j);
             }
-        } catch (ArrayIndexOutOfBoundsException e) {
-            throw new ArrayIndexOutOfBoundsException("Submatrix indices");
         }
     }
     
@@ -342,13 +308,11 @@ public:
      *
      * @return A'
      */
-    
-    public Matrix transpose() {
-        Matrix X = new Matrix(n, m);
-        double[][] C = X.getArray();
+    Matrix transpose() {
+        Matrix X(n, m);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                C[j][i] = A[i][j];
+                X.set(j, i, A[i][j]);
             }
         }
         return X;
@@ -359,42 +323,31 @@ public:
      *
      * @return maximum column sum.
      */
-    
-    public double norm1() {
+    double norm1() {
         double f = 0;
         for (int j = 0; j < n; j++) {
             double s = 0;
             for (int i = 0; i < m; i++) {
-                s += Math.abs(A[i][j]);
+                s += abs(A[i][j]);
             }
-            f = Math.max(f, s);
+            f = max(f, s);
         }
         return f;
     }
     
     /**
-     * Two norm
-     *
-     * @return maximum singular value.
-     */
-    
-    // public double norm2 () {
-    // return (new SingularValueDecomposition(this).norm2());
-    // }
-    /**
      * Infinity norm
      *
      * @return maximum row sum.
      */
-    
-    public double normInf() {
+    double normInf() {
         double f = 0;
         for (int i = 0; i < m; i++) {
             double s = 0;
             for (int j = 0; j < n; j++) {
-                s += Math.abs(A[i][j]);
+                s += abs(A[i][j]);
             }
-            f = Math.max(f, s);
+            f = max(f, s);
         }
         return f;
     }
@@ -404,28 +357,25 @@ public:
      *
      * @return sqrt of sum of squares of all elements.
      */
-    
-    // public double normF () {
-    // double f = 0;
-    // for (int i = 0; i < m; i++) {
-    // for (int j = 0; j < n; j++) {
-    // f = Maths.hypot(f,A[i][j]);
-    // }
-    // }
-    // return f;
-    // }
+    double normF () {
+        double f = 0;
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                f = hypot(f, A[i][j]);
+            }
+        }
+        return f;
+    }
     /**
      * Unary minus
      *
      * @return -A
      */
-    
-    public Matrix uminus() {
-        Matrix X = new Matrix(m, n);
-        double[][] C = X.getArray();
+    Matrix uminus() {
+        Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                C[i][j] = -A[i][j];
+                X.set(i, j, -A[i][j]);
             }
         }
         return X;
@@ -434,18 +384,15 @@ public:
     /**
      * C = A + B
      *
-     * @param B
-     *            another matrix
+     * @param B another matrix
      * @return A + B
      */
-    
-    public Matrix plus(Matrix B) {
+    Matrix operator+(const Matrix& B) {
         checkMatrixDimensions(B);
-        Matrix X = new Matrix(m, n);
-        double[][] C = X.getArray();
+        Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                C[i][j] = A[i][j] + B.A[i][j];
+                X.set(i, j, this->A[i][j] + B.A[i][j]);
             }
         }
         return X;
@@ -459,31 +406,29 @@ public:
      * @return A + B
      */
     
-    public Matrix plusEquals(Matrix B) {
+    Matrix& operator+=(const Matrix &B) {
         checkMatrixDimensions(B);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                A[i][j] = A[i][j] + B.A[i][j];
+                this->set(i, j, this->A[i][j] + B.A[i][j]);
             }
         }
-        return this;
+        return *this;
     }
     
     /**
      * C = A - B
      *
-     * @param B
-     *            another matrix
+     * @param B another matrix
      * @return A - B
      */
     
-    public Matrix minus(Matrix B) {
+    Matrix operator-(const Matrix &B) {
         checkMatrixDimensions(B);
-        Matrix X = new Matrix(m, n);
-        double[][] C = X.getArray();
+        Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                C[i][j] = A[i][j] - B.A[i][j];
+                X.set(i, j, this->A[i][j] - B.A[i][j]);
             }
         }
         return X;
@@ -497,31 +442,28 @@ public:
      * @return A - B
      */
     
-    public Matrix minusEquals(Matrix B) {
+    Matrix& operator-=(const Matrix &B) {
         checkMatrixDimensions(B);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                A[i][j] = A[i][j] - B.A[i][j];
+                this->set(i, j, this->A[i][j] - B.A[i][j]);
             }
         }
-        return this;
+        return *this;
     }
     
     /**
      * Element-by-element multiplication, C = A.*B
      *
-     * @param B
-     *            another matrix
+     * @param B another matrix
      * @return A.*B
      */
-    
-    public Matrix arrayTimes(Matrix B) {
+    Matrix operator*(const Matrix &B) {
         checkMatrixDimensions(B);
-        Matrix X = new Matrix(m, n);
-        double[][] C = X.getArray();
+        Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                C[i][j] = A[i][j] * B.A[i][j];
+                X.set(i, j, this->A[i][j] * B.A[i][j]);
             }
         }
         return X;
@@ -530,19 +472,18 @@ public:
     /**
      * Element-by-element multiplication in place, A = A.*B
      *
-     * @param B
-     *            another matrix
+     * @param B another matrix
      * @return A.*B
      */
     
-    public Matrix arrayTimesEquals(Matrix B) {
+    Matrix& operator*=(const Matrix &B) {
         checkMatrixDimensions(B);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                A[i][j] = A[i][j] * B.A[i][j];
+                this->set(i, j, this->A[i][j] * B.A[i][j]);
             }
         }
-        return this;
+        return *this;
     }
     
     /**
@@ -553,13 +494,12 @@ public:
      * @return A./B
      */
     
-    public Matrix arrayRightDivide(Matrix B) {
+    Matrix operator/(const Matrix &B) {
         checkMatrixDimensions(B);
-        Matrix X = new Matrix(m, n);
-        double[][] C = X.getArray();
+        Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                C[i][j] = A[i][j] / B.A[i][j];
+                this->set(i, j, this->A[i][j] / B.A[i][j]);
             }
         }
         return X;
@@ -573,14 +513,14 @@ public:
      * @return A./B
      */
     
-    public Matrix arrayRightDivideEquals(Matrix B) {
+    Matrix& operator/=(const Matrix &B) {
         checkMatrixDimensions(B);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                A[i][j] = A[i][j] / B.A[i][j];
+                this->set(i, j, this->A[i][j] / B.A[i][j]);
             }
         }
-        return this;
+        return *this;
     }
     
     /**
@@ -593,7 +533,7 @@ public:
     
     public Matrix arrayLeftDivide(Matrix B) {
         checkMatrixDimensions(B);
-        Matrix X = new Matrix(m, n);
+        Matrix X(m, n);
         double[][] C = X.getArray();
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
@@ -660,14 +600,11 @@ public:
     /**
      * Linear algebraic matrix multiplication, A * B
      * 
-     * @param B
-     *            another matrix
+     * @param B another matrix
      * @return Matrix product, A * B
-     * @exception IllegalArgumentException
-     *                Matrix inner dimensions must agree.
      */
     
-    public Matrix times(Matrix B) {
+    public Matrix product(Matrix B) {
         if (B.m != n) {
             throw new IllegalArgumentException(
                                                "Matrix inner dimensions must agree.");
@@ -689,6 +626,11 @@ public:
             }
         }
         return X;
+    }
+    
+private:
+    void checkMatrixDimensions(Matrix B) {
+        assert (B.m != m || B.n != n);
     }
 };
 
