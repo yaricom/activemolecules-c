@@ -87,6 +87,7 @@
 		78D138401A66C1BF00278E67 /* random.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = random.h; sourceTree = "<group>"; };
 		78D138411A66C1BF00278E67 /* utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		78D138421A66C1BF00278E67 /* xgboost_main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = xgboost_main.cpp; sourceTree = "<group>"; };
+		78DAE9E01A6EBFB600B955EA /* Matrix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Matrix.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -152,6 +153,7 @@
 				78D03D521A6955D100C39D90 /* TestRunner.cpp */,
 				780488941A641A4700FF99B6 /* WeightedKNN.cpp */,
 				780488961A641A9A00FF99B6 /* WeightedKNN.h */,
+				78DAE9E01A6EBFB600B955EA /* Matrix.h */,
 				7850FA1A1A5C6A8C0045D4EF /* stdc++.h */,
 			);
 			path = "activemoleculesC++";

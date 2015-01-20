@@ -9,8 +9,34 @@
 #ifndef activemoleculesC___Utils_h
 #define activemoleculesC___Utils_h
 
+static bool LOG_DEBUG = true;
+/*! the message buffer length */
+const int kPrintBuffer = 1 << 12;
+inline void Printf(const char *fmt, ...) {
+    if (LOG_DEBUG) {
+        std::string msg(kPrintBuffer, '\0');
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(&msg[0], kPrintBuffer, fmt, args);
+        va_end(args);
+        fprintf(stderr, "%s", msg.c_str());
+    }
+}
+
+inline void Assert(bool exp, const char *fmt, ...) {
+    if (!exp) {
+        std::string msg(kPrintBuffer, '\0');
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(&msg[0], kPrintBuffer, fmt, args);
+        va_end(args);
+        fprintf(stderr, "AssertError:%s\n", msg.c_str());
+        exit(-1);
+    }
+}
+
 // toString
-template<class T> string i2s(T x) {ostringstream o; o << x; return o.str();}
+template<class T> std::string i2s(T x) {std::ostringstream o; o << x; return o.str();}
 
 // Random number generator
 struct RNG {

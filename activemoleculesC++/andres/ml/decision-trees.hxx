@@ -634,6 +634,7 @@ DecisionTree<FEATURE, LABEL>::learn(
             sampleIndexBegin, thresholdIndex,
             randomEngine
         );
+        std::cerr << "thresholdIndexNew: " << thresholdIndexNew << ", sampleIndexBegin: " << sampleIndexBegin << ", thresholdIndex: " << thresholdIndex << std::endl;
         #ifndef NDEBUG
         if(decisionNodes_[nodeIndexNew].isLeaf()) {
             assert(thresholdIndexNew == 0);
