@@ -35,8 +35,7 @@
 
 
 #ifdef LOCAL
-#include "stdc++.h"
-#include "Matrix.h"
+#include "Definitions.h"
 #else
 #include <bits/stdc++.h>
 #endif
