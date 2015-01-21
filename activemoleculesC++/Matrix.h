@@ -9,8 +9,6 @@
 #ifndef activemoleculesC___Matrix_h
 #define activemoleculesC___Matrix_h
 
-#include "stdc++.h"
-
 #define VC          vector
 #define VD          VC < double >
 #define VDD         VC < VD >
@@ -87,7 +85,7 @@ public:
      *
      * @return m, the number of rows.
      */
-    int getRowDimension() {
+    int getRowDimension() const {
         return m;
     }
     
@@ -96,7 +94,7 @@ public:
      *
      * @return n, the number of columns.
      */
-    int getColumnDimension() {
+    int getColumnDimension() const {
         return n;
     }
     
@@ -524,108 +522,34 @@ public:
     }
     
     /**
-     * Element-by-element left division, C = A.\B
+     * Element-by-element right division by scalar in place, A = A./s
      *
      * @param B
      *            another matrix
-     * @return A.\B
+     * @return A./B
      */
     
-    public Matrix arrayLeftDivide(Matrix B) {
-        checkMatrixDimensions(B);
-        Matrix X(m, n);
-        double[][] C = X.getArray();
+    Matrix& operator/=(const double s) {
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                C[i][j] = B.A[i][j] / A[i][j];
+                this->set(i, j, this->A[i][j] / s);
             }
         }
-        return X;
+        return *this;
     }
     
     /**
-     * Element-by-element left division in place, A = A.\B
-     * 
-     * @param B
-     *            another matrix
-     * @return A.\B
+     * Calculates matrix mean by columns
      */
-    
-    public Matrix arrayLeftDivideEquals(Matrix B) {
-        checkMatrixDimensions(B);
+    Matrix mean() {
+        Matrix current(1, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                A[i][j] = B.A[i][j] / A[i][j];
+                current.A[0][n] += this->A[i][n];
             }
         }
-        return this;
-    }
-    
-    /**
-     * Multiply a matrix by a scalar, C = s*A
-     * 
-     * @param s
-     *            scalar
-     * @return s*A
-     */
-    
-    public Matrix times(double s) {
-        Matrix X = new Matrix(m, n);
-        double[][] C = X.getArray();
-        for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                C[i][j] = s * A[i][j];
-            }
-        }
-        return X;
-    }
-    
-    /**
-     * Multiply a matrix by a scalar in place, A = s*A
-     * 
-     * @param s
-     *            scalar
-     * @return replace A by s*A
-     */
-    
-    public Matrix timesEquals(double s) {
-        for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                A[i][j] = s * A[i][j];
-            }
-        }
-        return this;
-    }
-    
-    /**
-     * Linear algebraic matrix multiplication, A * B
-     * 
-     * @param B another matrix
-     * @return Matrix product, A * B
-     */
-    
-    public Matrix product(Matrix B) {
-        if (B.m != n) {
-            throw new IllegalArgumentException(
-                                               "Matrix inner dimensions must agree.");
-        }
-        Matrix X = new Matrix(m, B.n);
-        double[][] C = X.getArray();
-        double[] Bcolj = new double[n];
-        for (int j = 0; j < B.n; j++) {
-            for (int k = 0; k < n; k++) {
-                Bcolj[k] = B.A[k][j];
-            }
-            for (int i = 0; i < m; i++) {
-                double[] Arowi = A[i];
-                double s = 0;
-                for (int k = 0; k < n; k++) {
-                    s += Arowi[k] * Bcolj[k];
-                }
-                C[i][j] = s;
-            }
-        }
-        return X;
+        current /= m;
+        return current;
     }
     
 private:
