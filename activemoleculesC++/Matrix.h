@@ -81,6 +81,16 @@ public:
     }
     
     /**
+     * Adds row of data
+     *
+     * @param vals the row of data to add
+     */
+    void addRow(const VD &vals) {
+        assert(vals.size() == n);
+        A.push_back(vals);
+    }
+    
+    /**
      * Get row dimension.
      *
      * @return m, the number of rows.
@@ -279,18 +289,11 @@ public:
     /**
      * Set a submatrix.
      *
-     * @param i0
-     *            Initial row index
-     * @param i1
-     *            Final row index
-     * @param c
-     *            Array of column indices.
-     * @param X
-     *            A(i0:i1,c(:))
-     * @exception ArrayIndexOutOfBoundsException
-     *                Submatrix indices
+     * @param i0 Initial row index
+     * @param i1 Final row index
+     * @param c Array of column indices.
+     * @param X A(i0:i1,c(:))
      */
-    
     void setMatrix(const int i0, const int i1, const VI c, const Matrix &X) {
         assert(i0 >= 0 && i0 < i1 && i1 < m);
         for (int i = i0; i <= i1; i++) {
@@ -452,6 +455,7 @@ public:
     
     /**
      * Element-by-element multiplication, C = A.*B
+     * the Hadamard product (also known as the Schur product [1] or the entrywise product[2])
      *
      * @param B another matrix
      * @return A.*B
@@ -469,6 +473,7 @@ public:
     
     /**
      * Element-by-element multiplication in place, A = A.*B
+     * the Hadamard product (also known as the Schur product [1] or the entrywise product[2])
      *
      * @param B another matrix
      * @return A.*B
@@ -497,7 +502,7 @@ public:
         Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                this->set(i, j, this->A[i][j] / B.A[i][j]);
+                X.set(i, j, this->A[i][j] / B.A[i][j]);
             }
         }
         return X;
@@ -506,8 +511,7 @@ public:
     /**
      * Element-by-element right division in place, A = A./B
      *
-     * @param B
-     *            another matrix
+     * @param B another matrix
      * @return A./B
      */
     
@@ -522,23 +526,105 @@ public:
     }
     
     /**
-     * Element-by-element right division by scalar in place, A = A./s
+     * Element-by-element left division, C = A.\B
      *
-     * @param B
-     *            another matrix
-     * @return A./B
+     * @param B another matrix
+     * @return A.\B
      */
     
-    Matrix& operator/=(const double s) {
+    Matrix arrayLeftDivide(const Matrix &B) {
+        checkMatrixDimensions(B);
+        Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                this->set(i, j, this->A[i][j] / s);
+                X.set(i, j, B.A[i][j] / this->A[i][j]);
+            }
+        }
+        return X;
+    }
+    
+    /**
+     * Element-by-element left division in place, A = A.\B
+     * 
+     * @param B
+     *            another matrix
+     * @return A.\B
+     */
+    
+    Matrix& arrayLeftDivideEquals(const Matrix &B) {
+        checkMatrixDimensions(B);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                this->set(i, j, B.A[i][j] / this->A[i][j]);
             }
         }
         return *this;
     }
     
     /**
+     * Multiply a matrix by a scalar, C = s*A
+     * 
+     * @param s scalar
+     * @return s*A
+     */
+    
+    Matrix operator*(const double s) {
+        Matrix X(m, n);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                X.set(i, j, s * this->A[i][j]);
+            }
+        }
+        return X;
+    }
+    
+    /**
+     * Multiply a matrix by a scalar in place, A = s*A
+     * 
+     * @param s scalar
+     * @return replace A by s*A
+     */
+    
+    Matrix& operator*=(const double s) {
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                this->set(i, j, s * this->A[i][j]);
+            }
+        }
+        return *this;
+    }
+    
+    /**
+     * Linear algebraic matrix multiplication, A * B
+     * Matrix product
+     * 
+     * @param B another matrix
+     * @return Matrix product, A x B
+     */
+    
+    Matrix matmul(const Matrix &B) {
+        // Matrix inner dimensions must agree."
+        assert (B.m != n);
+        
+        Matrix X(m, B.n);
+        double Bcolj[n];
+        for (int j = 0; j < B.n; j++) {
+            for (int k = 0; k < n; k++) {
+                Bcolj[k] = B.A[k][j];
+            }
+            for (int i = 0; i < m; i++) {
+                VD Arowi = A[i];
+                double s = 0;
+                for (int k = 0; k < n; k++) {
+                    s += Arowi[k] * Bcolj[k];
+                }
+                X.set(i, j, s);
+            }
+        }
+        return X;
+    }
+
+	/**
      * Calculates matrix mean by columns
      */
     Matrix mean() {
