@@ -141,7 +141,8 @@ inline double getTime() {
     return tv.tv_sec + 1e-6 * tv.tv_usec;
 }
 
-template<class bidiiter> bidiiter random_unique(bidiiter begin, bidiiter end, size_t num_random) {
+template<class bidiiter> bidiiter
+random_unique(bidiiter begin, bidiiter end, size_t num_random) {
     size_t left = std::distance(begin, end);
     while (num_random--) {
         bidiiter r = begin;
