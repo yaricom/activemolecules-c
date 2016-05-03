@@ -1,4 +1,3 @@
-# activemolecules-c
 ## Overwiev ##
 Provided with set of data describing complex molecules and experimentaly detected reactions with antigens the main task 
 was to build and train data model able to rank new data sets in accordance with similarity to known molecules.
